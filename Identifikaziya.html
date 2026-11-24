@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Разложи по полкам</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    display:flex;justify-content:center;align-items:center;
+    min-height:100vh;background:#ffffff;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    color:#1b2a41;
+  }
+
+  /* ===== фиксированный размер 650 × 600, без границ и тени ===== */
+  .app{
+    width:650px;height:600px;
+    background:#ffffff;
+    display:flex;flex-direction:column;
+    padding:14px;
+    gap:10px;
+    overflow:hidden;
+  }
+
+  /* ===== header: только прогресс ===== */
+  .head{
+    display:flex;justify-content:flex-end;align-items:center;
+    flex:0 0 auto;
+  }
+  .progress{
+    font-size:12px;color:#1c5ea0;
+    background:#e3eefb;padding:4px 10px;border-radius:99px;
+    font-variant-numeric:tabular-nums;font-weight:600;
+  }
+
+  /* ===== стопка карточек сверху ===== */
+  .stack{
+    flex:0 0 auto;
+    background:#f2f7fe;
+    border-radius:12px;
+    border:1.5px dashed #b6d1f2;
+    padding:8px 11px 10px;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .stack-head{
+    display:flex;align-items:center;gap:8px;
+  }
+  .stack-label{
+    font-size:11px;color:#5a7aa3;
+    text-transform:uppercase;letter-spacing:.6px;font-weight:700;
+  }
+  .stack-count{
+    margin-left:auto;
+    font-size:11px;color:#5a7aa3;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .hint-btn{
+    flex:0 0 auto;
+    border:1px solid #a9c8ec;background:#ffffff;color:#1c5ea0;
+    padding:3px 9px;border-radius:6px;
+    font-size:11px;font-weight:600;line-height:1.35;
+    cursor:pointer;white-space:nowrap;
+    transition:background .15s,border-color .15s;
+  }
+  .hint-btn:hover:not(:disabled){background:#eef5ff;border-color:#7fade0}
+  .hint-btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .stack-body{
+    width:100%;display:flex;justify-content:center;align-items:center;
+    min-height:42px;
+  }
+  .stack-body .card{width:100%;max-width:520px;box-shadow:0 3px 10px rgba(25,80,150,.10)}
+  .stack-empty{
+    font-size:12.5px;color:#5a7aa3;text-align:center;
+    padding:6px 24px;line-height:1.45;
+  }
+
+  .stack-hint{
+    display:none;
+    font-size:11.5px;line-height:1.42;color:#2f5578;
+    background:#ffffff;border-left:3px solid #1c7ed6;
+    border-radius:6px;padding:6px 9px;
+    max-height:56px;overflow-y:auto;
+  }
+  .stack-hint.show{display:block}
+  .stack-hint::-webkit-scrollbar{width:5px}
+  .stack-hint::-webkit-scrollbar-thumb{background:#c8dcf3;border-radius:99px}
+
+  /* ===== карточки ===== */
+  .card{
+    background:#ffffff;
+    border:1.5px solid #c8dcf3;
+    border-radius:10px;
+    padding:9px 11px;
+    font-size:12.5px;line-height:1.35;
+    cursor:grab;
+    user-select:none;
+    touch-action:none;
+    transition:box-shadow .15s,border-color .15s,background .15s;
+    position:relative;
+  }
+  .card:hover{box-shadow:0 4px 14px rgba(25,80,150,.15);border-color:#a9c8ec}
+  .card.dragging{opacity:.3}
+
+  .card.ghost{
+    position:fixed;z-index:999;pointer-events:none;
+    box-shadow:0 14px 34px rgba(25,80,150,.3);
+    transform:rotate(-1.5deg) scale(1.02);
+    cursor:grabbing;
+  }
+
+  /* ===== полки ===== */
+  .shelves{
+    flex:1 1 auto;
+    display:grid;grid-template-columns:repeat(3,1fr);
+    gap:9px;min-height:0;
+  }
+  .shelf{
+    background:#ffffff;
+    border-radius:12px;
+    border:1.5px solid #d7e5f6;
+    display:flex;flex-direction:column;
+    min-height:0;
+    border-top:3px solid var(--accent);
+  }
+  .shelf[data-cat="danger"]{--accent:#f76707}
+  .shelf[data-cat="event"] {--accent:#1c7ed6}
+  .shelf[data-cat="risk"]  {--accent:#7048e8}
+
+  .shelf-head{
+    padding:7px 8px 5px;
+    border-bottom:1px solid #eef3fa;
+    flex:0 0 auto;
+  }
+  .shelf-head h2{
+    font-size:12.5px;margin:0 0 1px;color:var(--accent);
+    letter-spacing:.2px;
+  }
+  .shelf-head span{font-size:10.5px;color:#7a8fa8;line-height:1.3;display:block}
+
+  .dropzone{
+    flex:1 1 auto;
+    overflow-y:auto;
+    padding:6px;
+    display:flex;flex-direction:column;gap:5px;
+    outline:2px dashed transparent;outline-offset:-4px;
+    transition:background .15s,outline-color .15s;
+    min-height:0;
+  }
+  .dropzone.over{background:#eef5ff;outline-color:#4c8bf5}
+  .dropzone::-webkit-scrollbar{width:5px}
+  .dropzone::-webkit-scrollbar-thumb{background:#c8dcf3;border-radius:99px}
+
+  .dropzone .card{
+    font-size:11px;padding:7px 22px 7px 8px;
+  }
+
+  /* ===== состояния после проверки ===== */
+  .card.right{border-color:#2f9e44;background:#f2fbf4}
+  .card.wrong{border-color:#e03131;background:#fff5f5}
+  .card.locked{cursor:default}
+
+  .mark{
+    position:absolute;top:4px;right:6px;
+    font-weight:800;font-size:12px;line-height:1;
+  }
+  .card.right .mark{color:#2f9e44}
+  .card.wrong .mark{color:#e03131}
+
+  .card-why{
+    display:none;
+    margin-top:5px;padding-top:5px;
+    border-top:1px dashed #d0dcea;
+    font-size:10.5px;color:#3e5a7a;line-height:1.32;
+  }
+  .card.revealed .card-why{display:block}
+
+  /* ===== футер ===== */
+  .foot{
+    flex:0 0 auto;
+    display:flex;gap:8px;align-items:center;
+  }
+  .status{
+    flex:1;font-size:11.5px;color:#5a7aa3;line-height:1.35;
+    min-height:30px;display:flex;align-items:center;
+  }
+  .btn{
+    border:none;
+    padding:8px 15px;border-radius:9px;
+    font-size:12.5px;font-weight:600;
+    cursor:pointer;transition:background .15s;
+    white-space:nowrap;
+  }
+  .btn-primary{background:#1c7ed6;color:#fff}
+  .btn-primary:hover:not(:disabled){background:#1971c2}
+  .btn-primary:disabled{background:#b9d1ea;cursor:not-allowed}
+  .btn-secondary{background:#e3eefb;color:#1c5ea0}
+  .btn-secondary:hover{background:#d3e3f7}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="head">
+    <span class="progress" id="progress">0 / 0</span>
+  </div>
+
+  <div class="stack">
+    <div class="stack-head">
+      <span class="stack-label">Карточка</span>
+      <span class="stack-count" id="stackCount"></span>
+      <button class="hint-btn" id="hintBtn" disabled>Подсказка</button>
+    </div>
+    <div class="stack-body" id="stackBody"></div>
+    <div class="stack-hint" id="stackHint"></div>
+  </div>
+
+  <div class="shelves">
+    <section class="shelf" data-cat="danger">
+      <div class="shelf-head">
+        <h2>Опасность</h2>
+        <span>источник угрозы</span>
+      </div>
+      <div class="dropzone" data-cat="danger"></div>
+    </section>
+
+    <section class="shelf" data-cat="event">
+      <div class="shelf-head">
+        <h2>Событие</h2>
+        <span>что произошло</span>
+      </div>
+      <div class="dropzone" data-cat="event"></div>
+    </section>
+
+    <section class="shelf" data-cat="risk">
+      <div class="shelf-head">
+        <h2>Риск</h2>
+        <span>мера: число или оценка</span>
+      </div>
+      <div class="dropzone" data-cat="risk"></div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <span class="status" id="status">Перетащите карточку на нужную полку.</span>
+    <button class="btn btn-secondary" id="reset">Сбросить</button>
+    <button class="btn btn-primary" id="check" disabled>Проверить</button>
+  </div>
+
+</div>
+
+<script>
+/* ============ данные ============ */
+const CARDS = [
+  { text: 'Избыточное давление в аппарате', cat: 'danger',
+    why: 'Запасённая энергия — потенциальный источник. Ничего ещё не произошло.' },
+  { text: 'Разгерметизация фланцевого соединения', cat: 'event',
+    why: 'Потеря герметичности уже реализовалась — это событие.' },
+  { text: 'Частота гибели персонала 10⁻⁵ год⁻¹', cat: 'risk',
+    why: 'Численная оценка частоты — мера, то есть риск.' },
+  { text: 'Резервуар с легковоспламеняющейся жидкостью', cat: 'danger',
+    why: 'Объект с потенциальной энергией — источник угрозы.' },
+  { text: 'Выброс углеводородов из трубопровода', cat: 'event',
+    why: 'Высвобождение вещества уже произошло — событие.' },
+  { text: 'Индивидуальный риск гибели оператора 10⁻⁴ год⁻¹', cat: 'risk',
+    why: 'Вероятностная мера для человека — риск.' },
+  { text: 'Нагретая до 300 °C поверхность трубопровода', cat: 'danger',
+    why: 'Потенциальный источник теплового поражения. Контакта ещё не было.' },
+  { text: 'Отказ датчика уровня в резервуаре', cat: 'event',
+    why: 'Отказ оборудования — свершившийся факт, то есть событие.' },
+  { text: 'Качественная оценка «высокий риск» по матрице', cat: 'risk',
+    why: 'Качественная мера — тоже риск.' }
+];
+
+/* ============ элементы ============ */
+const stackBody  = document.getElementById('stackBody');
+const stackCount = document.getElementById('stackCount');
+const stackHint  = document.getElementById('stackHint');
+const hintBtn    = document.getElementById('hintBtn');
+const progress   = document.getElementById('progress');
+const statusEl   = document.getElementById('status');
+const checkBtn   = document.getElementById('check');
+const resetBtn   = document.getElementById('reset');
+const zones      = () => Array.from(document.querySelectorAll('.dropzone'));
+
+/* ============ состояние ============ */
+let deck = [];
+let placedCount = 0;
+let checked = false;
+let hintVisible = false;
+
+/* ============ утилиты ============ */
+function shuffle(a){
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeCard(data){
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.dataset.cat = data.cat;
+  el.innerHTML =
+    '<span class="mark"></span>' +
+    '<div class="card-text"></div>' +
+    '<div class="card-why"></div>';
+  el.querySelector('.card-text').textContent = data.text;
+  el.querySelector('.card-why').textContent = 'Почему: ' + data.why;
+  return el;
+}
+
+/* ============ рендер стопки ============ */
+function renderStack(){
+  stackBody.innerHTML = '';
+  stackCount.textContent = deck.length ? 'осталось ' + deck.length : '';
+
+  hintVisible = false;
+  stackHint.classList.remove('show');
+  stackHint.textContent = '';
+  hintBtn.textContent = 'Подсказка';
+
+  if (deck.length === 0){
+    hintBtn.disabled = true;
+    const empty = document.createElement('div');
+    empty.className = 'stack-empty';
+    empty.textContent = checked
+      ? 'Все карточки разложены. Обоснования — на полках.'
+      : 'Все карточки разложены. Нажмите «Проверить».';
+    stackBody.appendChild(empty);
+    return;
+  }
+
+  hintBtn.disabled = false;
+  stackBody.appendChild(makeCard(deck[0]));
+}
+
+/* ============ интерфейс ============ */
+function updateProgress(){
+  progress.textContent = placedCount + ' / ' + CARDS.length;
+}
+
+function updateControls(){
+  const allPlaced = deck.length === 0;
+  checkBtn.disabled = !allPlaced || checked;
+
+  if (checked){
+    const total   = CARDS.length;
+    const correct = document.querySelectorAll('.card.right').length;
+    if (correct === total){
+      statusEl.innerHTML = '<b style="color:#1e6b3a">Всё верно: ' + correct + ' из ' + total + '.</b>';
+    } else {
+      statusEl.innerHTML = '<b style="color:#a45a00">Верно ' + correct + ' из ' + total + '.</b> Ошибки отмечены ✗.';
+    }
+  } else if (allPlaced){
+    statusEl.textContent = 'Все карточки на полках. Нажмите «Проверить».';
+  } else {
+    statusEl.textContent = 'Перетащите карточку на нужную полку.';
+  }
+}
+
+/* ============ подсказка ============ */
+hintBtn.addEventListener('click', () => {
+  if (!deck.length) return;
+  hintVisible = !hintVisible;
+
+  if (hintVisible){
+    stackHint.textContent = 'Почему: ' + deck[0].why;
+    stackHint.classList.add('show');
+    hintBtn.textContent = 'Скрыть';
+  } else {
+    stackHint.classList.remove('show');
+    stackHint.textContent = '';
+    hintBtn.textContent = 'Подсказка';
+  }
+});
+
+/* ============ перетаскивание ============ */
+let drag = null;
+
+function zoneAt(x, y){
+  const el = document.elementFromPoint(x, y);
+  return el ? el.closest('.dropzone') : null;
+}
+
+function startDrag(card, e){
+  const r = card.getBoundingClientRect();
+
+  const ghost = card.cloneNode(true);
+  ghost.classList.add('ghost');
+  ghost.classList.remove('dragging');
+  ghost.style.width = r.width + 'px';
+  ghost.style.left  = r.left + 'px';
+  ghost.style.top   = r.top + 'px';
+  document.body.appendChild(ghost);
+
+  card.classList.add('dragging');
+  drag = { card, ghost, dx: e.clientX - r.left, dy: e.clientY - r.top };
+
+  window.addEventListener('pointermove', onMove, { passive: false });
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+}
+
+function onMove(e){
+  if (!drag) return;
+  e.preventDefault();
+  drag.ghost.style.left = (e.clientX - drag.dx) + 'px';
+  drag.ghost.style.top  = (e.clientY - drag.dy) + 'px';
+
+  const z = zoneAt(e.clientX, e.clientY);
+  zones().forEach(d => d.classList.toggle('over', d === z));
+}
+
+function onUp(e){
+  window.removeEventListener('pointermove', onMove);
+  window.removeEventListener('pointerup', onUp);
+  window.removeEventListener('pointercancel', onUp);
+
+  if (!drag) return;
+  const d = drag; drag = null;
+
+  d.ghost.remove();
+  d.card.classList.remove('dragging');
+  zones().forEach(z => z.classList.remove('over'));
+
+  const zone = zoneAt(e.clientX, e.clientY);
+  if (!zone) return;
+
+  if (d.card.parentElement === stackBody){
+    const data = deck.shift();
+    const shelfCard = makeCard(data);
+    shelfCard.classList.add('placed');
+    zone.appendChild(shelfCard);
+
+    placedCount++;
+    renderStack();
+    updateProgress();
+    updateControls();
+    return;
+  }
+
+  if (!checked && zone !== d.card.parentElement){
+    zone.appendChild(d.card);
+  }
+}
+
+document.addEventListener('pointerdown', e => {
+  const card = e.target.closest('.card');
+  if (!card) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (checked) return;
+  if (card.classList.contains('locked')) return;
+
+  e.preventDefault();
+  startDrag(card, e);
+});
+
+/* ============ проверка ============ */
+function doCheck(){
+  checked = true;
+
+  zones().forEach(zone => {
+    const shelfCat = zone.closest('.shelf').dataset.cat;
+    zone.querySelectorAll('.card').forEach(card => {
+      const mark = card.querySelector('.mark');
+      card.classList.add('revealed');
+      if (card.dataset.cat === shelfCat){
+        card.classList.add('right', 'locked');
+        mark.textContent = '✓';
+      } else {
+        card.classList.add('wrong', 'locked');
+        mark.textContent = '✗';
+      }
+    });
+  });
+
+  updateControls();
+}
+
+/* ============ сброс ============ */
+function doReset(){
+  checked     = false;
+  placedCount = 0;
+  hintVisible = false;
+  deck        = shuffle(CARDS.slice());
+
+  zones().forEach(z => (z.innerHTML = ''));
+  renderStack();
+  updateProgress();
+  updateControls();
+}
+
+/* ============ старт ============ */
+checkBtn.addEventListener('click', doCheck);
+resetBtn.addEventListener('click', doReset);
+
+doReset();
+</script>
+</body>
+</html>
