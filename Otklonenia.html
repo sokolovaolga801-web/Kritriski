@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тренажёр HAZOP — линия нагнетания насоса</title>
+<style>
+  :root{
+    --ink:#18222e; --muted:#5c6b7c;
+    --accent:#0b5fc4; --accent-soft:#e6effb;
+    --ok:#0f7a54; --ok-soft:#e2f5ec;
+    --err:#bb2736; --err-soft:#fbe9eb;
+    --violet:#6b2a9a; --violet-soft:#f3e9fb;
+    --fill:#f4f7fb; --fill-hover:#e9eff8;
+  }
+  *{box-sizing:border-box}
+  html,body{background:#fff}
+  body{
+    margin:0;padding:24px;
+    color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    width:650px;max-width:100%;height:600px;overflow-y:auto;
+    margin:0 auto;padding:20px 22px 24px;
+    background:#fff;
+    scrollbar-width:thin;scrollbar-color:#d5dde8 transparent;
+  }
+  .app::-webkit-scrollbar{width:8px}
+  .app::-webkit-scrollbar-thumb{background:#d5dde8;border-radius:99px}
+  .app::-webkit-scrollbar-track{background:transparent}
+
+  h1{font-size:18px;margin:0 0 14px;line-height:1.25;letter-spacing:-.01em;font-weight:700}
+
+  .progress{display:flex;gap:6px;margin:0 0 16px}
+  .dot{height:5px;flex:1;border-radius:99px;background:#dde4ee;transition:background .3s}
+  .dot.done{background:var(--ok)}
+  .dot.revealed{background:var(--violet)}
+  .dot.active{background:var(--accent)}
+
+  .scenario-head{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .step-tag{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .node{font-size:12px;color:var(--muted);background:var(--fill);padding:3px 10px;border-radius:99px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .chip{padding:4px 11px;border-radius:99px;font-size:12px;font-weight:650}
+  .chip-param{background:var(--accent-soft);color:#0a4a99}
+  .chip-gw{background:var(--violet-soft);color:var(--violet)}
+
+  .columns{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .col h2{font-size:14px;margin:0 0 4px;font-weight:700;line-height:1.3}
+  .col .lead{font-size:12px;line-height:1.4;margin:0 0 10px;color:var(--muted)}
+  .step-num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:18px;height:18px;border-radius:6px;margin-right:6px;
+    background:var(--accent);color:#fff;font-size:11px;font-weight:700;vertical-align:1px;
+  }
+  .step-num-2{background:var(--violet)}
+  .counter{font-size:11px;font-weight:600;color:var(--muted);margin-left:4px;white-space:nowrap}
+
+  .options{display:grid;gap:6px}
+  button.option{
+    display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;
+    font:inherit;font-size:12.5px;line-height:1.35;color:inherit;cursor:pointer;
+    background:var(--fill);border:0;border-radius:8px;padding:8px 10px;
+    transition:background .15s, transform .06s;
+  }
+  button.option:hover:not(:disabled){background:var(--fill-hover)}
+  button.option:active:not(:disabled){transform:scale(.995)}
+  button.option:disabled{cursor:default;opacity:.72}
+  button.option .marker{flex:0 0 16px;height:16px;margin-top:1px;border-radius:5px;background:#dfe6ef}
+  button.option .otext{flex:1;min-width:0}
+
+  button.option.picked{background:var(--accent-soft)}
+  button.option.picked .marker{background:var(--accent)}
+  button.option.picked .marker::after{content:"✓";color:#fff;font-size:11px;line-height:16px;display:block;text-align:center}
+
+  button.option.good{background:var(--ok-soft);opacity:1}
+  button.option.good .marker{background:var(--ok)}
+  button.option.good .marker::after{content:"✓";color:#fff;font-size:11px;line-height:16px;display:block;text-align:center}
+
+  button.option.bad{background:var(--err-soft)}
+  button.option.bad .marker{background:var(--err)}
+  button.option.bad .marker::after{content:"×";color:#fff;font-size:12px;line-height:16px;display:block;text-align:center}
+
+  button.option.hint{background:var(--violet-soft);opacity:1}
+  button.option.hint .marker{background:var(--violet)}
+  button.option.hint .marker::after{content:"✓";color:#fff;font-size:11px;line-height:16px;display:block;text-align:center}
+
+  .feedback{margin-top:14px;padding:11px 14px;border-radius:10px;font-size:13px;border:0;line-height:1.45}
+  .feedback.ok{background:var(--ok-soft);color:#0a5a3d}
+  .feedback.err{background:var(--err-soft);color:#8d1f2c}
+  .feedback.hint{background:var(--violet-soft);color:#4d1a73}
+  .feedback ul{margin:6px 0 0;padding-left:18px}
+  .feedback li{margin:3px 0}
+
+  .nav{display:flex;gap:8px;margin-top:16px;align-items:stretch}
+  button.btn{
+    font:inherit;font-size:13.5px;font-weight:650;cursor:pointer;border:0;border-radius:9px;
+    padding:10px 14px;transition:background .15s,color .15s;white-space:nowrap;
+  }
+  button.btn.primary{background:var(--accent);color:#fff}
+  button.btn.primary:hover:not(:disabled){background:#0a53ab}
+  button.btn.ghost{background:var(--fill);color:var(--accent)}
+  button.btn.ghost:hover:not(:disabled){background:var(--fill-hover)}
+  button.btn:disabled{opacity:.45;cursor:default}
+  #checkBtn{flex:1}
+
+  .final h2{font-size:16px;margin:0 0 4px;font-weight:700}
+  .final .lead{font-size:12.5px;color:var(--muted);margin:0 0 8px;line-height:1.45}
+
+  .table-wrap{overflow-x:auto;margin-top:12px;border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:560px}
+  th,td{text-align:left;padding:8px 10px;vertical-align:top;border:0;line-height:1.35}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;white-space:nowrap}
+  tbody tr:nth-child(odd){background:#f7f9fc}
+  tbody tr.revealed-row{background:var(--violet-soft)}
+  td.num{color:var(--muted);width:26px}
+  .reveal-tag{color:var(--violet);font-size:11px;font-weight:700;white-space:nowrap}
+
+  .stat{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+  .stat span{background:var(--fill);border-radius:99px;padding:5px 12px;font-size:12.5px;font-weight:600}
+
+  .closing{margin-top:14px;font-size:13px;color:var(--muted);line-height:1.45}
+
+  [hidden]{display:none !important}
+
+  @media (max-width:600px){
+    body{padding:12px}
+    .columns{grid-template-columns:1fr;gap:22px}
+    .nav{flex-wrap:wrap}
+    button.btn{flex:1 1 auto}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>HAZOP: от ключевого слова до причины</h1>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <main id="stage"></main>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ */
+/*  Данные сценариев                                                   */
+/* ------------------------------------------------------------------ */
+const TASKS = [
+  {
+    node: 'Линия нагнетания насоса Н-101',
+    parameter: 'РАСХОД',
+    guideWord: 'НЕТ',
+    options: [
+      { text: 'Отсутствие расхода на линии нагнетания при работающем насосе', correct: true },
+      { text: 'Насос вышел из строя', correct: false,
+        why: 'Это причина, да ещё и предельно общая. Отклонение описывает состояние параметра, а не поломку.' },
+      { text: 'Отсутствие расхода при остановленном насосе', correct: false,
+        why: 'Для остановленного насоса это норма, а не отклонение. Ключевое слово применяется к работающему узлу.' },
+      { text: 'Пониженное давление во всасывающем коллекторе', correct: false,
+        why: 'Другой параметр и другой участок. Анализируем линию нагнетания.' }
+    ],
+    causes: [
+      { text: 'Засорение фильтра на всасе насоса', correct: true },
+      { text: 'Заклинивание задвижки на нагнетании', correct: true },
+      { text: 'Отказ оборудования', correct: false,
+        why: 'Общая формулировка: группе нечего проверять. Нужен конкретный элемент и механизм.' },
+      { text: 'Пожар в насосной', correct: false,
+        why: 'Это последствие, а не причина. Причина отвечает на вопрос «почему возникло отклонение».' },
+      { text: 'Остановка насоса', correct: false,
+        why: 'Противоречит условию: отклонение сформулировано для работающего насоса.' }
+    ]
+  },
+  {
+    node: 'Линия нагнетания насоса Н-101',
+    parameter: 'ДАВЛЕНИЕ',
+    guideWord: 'БОЛЬШЕ',
+    options: [
+      { text: 'Превышение давления на линии нагнетания', correct: true },
+      { text: 'Разрыв трубопровода нагнетания', correct: false,
+        why: 'Это последствие превышения давления, а не само отклонение.' },
+      { text: 'Повышенная температура подшипников насоса', correct: false,
+        why: 'Другой параметр (температура) и другой элемент. Ключевое слово применено не к тому параметру.' },
+      { text: 'Больший расход через насос', correct: false,
+        why: 'Ключевое слово применено к расходу, а анализируем давление.' }
+    ],
+    causes: [
+      { text: 'Прикрыта задвижка на нагнетании', correct: true },
+      { text: 'Заклинивание регулятора давления', correct: true },
+      { text: 'Отказ оборудования', correct: false,
+        why: 'Общая формулировка: не назван ни элемент, ни механизм.' },
+      { text: 'Разрыв трубопровода нагнетания', correct: false,
+        why: 'Это последствие, причём того же отклонения. Причину оно не объясняет.' },
+      { text: 'Перегрев подшипников насоса', correct: false,
+        why: 'Относится к другому параметру и другому элементу, к давлению на нагнетании не ведёт.' }
+    ]
+  },
+  {
+    node: 'Линия нагнетания насоса Н-101',
+    parameter: 'РАСХОД',
+    guideWord: 'ОБРАТНО',
+    options: [
+      { text: 'Обратный поток (обратное течение) на линии нагнетания', correct: true },
+      { text: 'Обратное вращение вала насоса', correct: false,
+        why: 'Это другое отклонение — механическое. К параметру «расход» ключевое слово не применено.' },
+      { text: 'Отказ обратного клапана', correct: false,
+        why: 'Это причина, причём сформулированная как отказ оборудования, а не как отклонение параметра.' },
+      { text: 'Снижение расхода на линии нагнетания', correct: false,
+        why: 'Это ключевое слово «МЕНЬШЕ», а не «ОБРАТНО».' }
+    ],
+    causes: [
+      { text: 'Износ тарелки и седла обратного клапана', correct: true },
+      { text: 'Открыт байпас вокруг обратного клапана', correct: true },
+      { text: 'Отказ обратного клапана', correct: false,
+        why: 'Та же общая формулировка «отказ», только с названием элемента. Не показан механизм — износ, заклинивание, пропуск.' },
+      { text: 'Разрыв трубопровода нагнетания', correct: false,
+        why: 'Это последствие, а не причина обратного потока.' },
+      { text: 'Обратное вращение вала насоса', correct: false,
+        why: 'Это другое отклонение, а не причина. Его нужно анализировать отдельно.' }
+    ]
+  },
+  {
+    node: 'Линия нагнетания насоса Н-101',
+    parameter: 'ДАВЛЕНИЕ',
+    guideWord: 'МЕНЬШЕ',
+    options: [
+      { text: 'Снижение (падение) давления на линии нагнетания', correct: true },
+      { text: 'Утечка через сальниковое уплотнение', correct: false,
+        why: 'Это причина, а не отклонение параметра.' },
+      { text: 'Кавитация в насосе', correct: false,
+        why: 'Это явление-причина. Отклонение должно называть состояние параметра.' },
+      { text: 'Понижение уровня в резервуаре', correct: false,
+        why: 'Другой параметр и другой узел — не линия нагнетания.' }
+    ],
+    causes: [
+      { text: 'Утечка через уплотнение насоса', correct: true },
+      { text: 'Не полностью открыта задвижка на нагнетании', correct: true },
+      { text: 'Отказ оборудования', correct: false,
+        why: 'Общая формулировка без элемента и механизма.' },
+      { text: 'Разгерметизация с пожаром', correct: false,
+        why: 'Это уже последствие. Причина — то, что привело к разгерметизации.' },
+      { text: 'Понижение уровня в резервуаре', correct: false,
+        why: 'Другой узел и другой параметр: анализируем линию нагнетания, а не резервуар.' }
+    ]
+  },
+  {
+    node: 'Линия нагнетания насоса Н-101',
+    parameter: 'ТЕМПЕРАТУРА',
+    guideWord: 'БОЛЬШЕ',
+    options: [
+      { text: 'Повышение температуры перекачиваемой среды на линии нагнетания', correct: true },
+      { text: 'Перегрев подшипников насоса', correct: false,
+        why: 'Параметр тот же, но объект другой: подшипник — не линия нагнетания.' },
+      { text: 'Пожар в насосной', correct: false,
+        why: 'Это последствие, а не отклонение параметра.' },
+      { text: 'Снижение вязкости среды', correct: false,
+        why: 'Это следствие нагрева, а не само отклонение.' }
+    ],
+    causes: [
+      { text: 'Работа насоса на закрытую задвижку', correct: true },
+      { text: 'Отсутствие протока через теплообменник', correct: true },
+      { text: 'Перегрев подшипников насоса', correct: false,
+        why: 'Другой объект: подшипник — не перекачиваемая среда на линии нагнетания.' },
+      { text: 'Пожар в насосной', correct: false,
+        why: 'Это последствие, а не причина повышения температуры среды.' },
+      { text: 'Отказ оборудования', correct: false,
+        why: 'Общая формулировка: не назван ни элемент, ни механизм.' }
+    ]
+  }
+];
+
+/* ------------------------------------------------------------------ */
+/*  Утилиты и состояние                                                */
+/* ------------------------------------------------------------------ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+let states, idx;
+
+function initStates() {
+  states = TASKS.map(() => ({
+    dev: null,
+    causes: new Set(),
+    passed: false,
+    revealed: false,
+    badDev: false,
+    badCauses: new Set(),
+    attempted: false
+  }));
+  idx = 0;
+}
+
+function scrollTop() {
+  const app = document.querySelector('.app');
+  if (app) app.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Рендер сценария                                                    */
+/* ------------------------------------------------------------------ */
+function renderProgress() {
+  $('progress').innerHTML = TASKS.map((_, i) => {
+    let cls = '';
+    if (states[i].passed) cls = 'done';
+    else if (states[i].revealed) cls = 'revealed';
+    else if (i === idx) cls = 'active';
+    return `<span class="dot ${cls}"></span>`;
+  }).join('');
+}
+
+function render() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  renderProgress();
+
+  const locked = st.passed || st.revealed;
+  const dis = locked ? 'disabled' : '';
+
+  const devHtml = t.options.map((o, i) => {
+    let cls = 'option';
+    if (st.passed) {
+      if (st.dev === i) cls += ' good';
+    } else if (st.revealed) {
+      if (o.correct) cls += ' hint';
+      else if (st.dev === i) cls += ' bad';
+    } else if (st.dev === i) {
+      cls += st.badDev ? ' bad' : ' picked';
+    }
+    return `<button class="${cls}" data-i="${i}" ${dis}>
+      <span class="marker"></span><span class="otext">${esc(o.text)}</span>
+    </button>`;
+  }).join('');
+
+  const causeHtml = t.causes.map((c, i) => {
+    let cls = 'option';
+    if (st.passed) {
+      if (st.causes.has(i)) cls += ' good';
+    } else if (st.revealed) {
+      if (c.correct) cls += ' hint';
+      else if (st.badCauses.has(i)) cls += ' bad';
+    } else if (st.causes.has(i)) {
+      cls += st.badCauses.has(i) ? ' bad' : ' picked';
+    }
+    return `<button class="${cls}" data-i="${i}" ${dis}>
+      <span class="marker"></span><span class="otext">${esc(c.text)}</span>
+    </button>`;
+  }).join('');
+
+  let cnt;
+  if (st.passed) cnt = `${st.causes.size} — принято`;
+  else if (st.revealed) cnt = `${t.causes.filter(c => c.correct).length} — правильных`;
+  else cnt = `${st.causes.size} из 2`;
+
+  const checkLabel = st.passed ? 'Проверено ✓' : 'Проверить';
+  const checkDis = locked || st.dev === null || st.causes.size === 0;
+  const isLast = idx === TASKS.length - 1;
+  const nextLabel = isLast ? 'К таблице →' : 'Далее →';
+  const nextClass = locked ? 'primary' : 'ghost';
+  const hintBtn = locked ? '' : '<button class="btn ghost" id="hintBtn">Показать правильный ответ</button>';
+
+  $('stage').innerHTML = `
+    <div class="scenario-head">
+      <span class="step-tag">Сценарий ${idx + 1} из ${TASKS.length}</span>
+      <span class="node">${esc(t.node)}</span>
+    </div>
+    <div class="chips">
+      <span class="chip chip-param">Параметр: ${t.parameter}</span>
+      <span class="chip chip-gw">Ключевое слово: ${t.guideWord}</span>
+    </div>
+
+    <div class="columns">
+      <section class="col">
+        <h2><span class="step-num">1</span>Отклонение</h2>
+        <p class="lead">Ключевое слово + параметр — это состояние параметра. Без причины и без последствия.</p>
+        <div class="options" id="options1">${devHtml}</div>
+      </section>
+      <section class="col">
+        <h2><span class="step-num step-num-2">2</span>Причина <span class="counter">· ${cnt}</span></h2>
+        <p class="lead">Одна-две причины: элемент + механизм. Не «отказ оборудования» и не последствие.</p>
+        <div class="options" id="options2">${causeHtml}</div>
+      </section>
+    </div>
+
+    <div class="feedback" id="fb" ${st.attempted || st.passed || st.revealed ? '' : 'hidden'}></div>
+
+    <div class="nav">
+      <button class="btn ghost" id="backBtn" ${idx === 0 ? 'disabled' : ''}>← Назад</button>
+      <button class="btn primary" id="checkBtn" ${checkDis ? 'disabled' : ''}>${checkLabel}</button>
+      ${hintBtn}
+      <button class="btn ${nextClass}" id="nextBtn">${nextLabel}</button>
+    </div>
+  `;
+
+  renderFeedback();
+}
+
+function renderFeedback() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  const fb = $('fb');
+  if (!fb) return;
+
+  if (st.passed) {
+    fb.hidden = false;
+    fb.className = 'feedback ok';
+    fb.innerHTML = `<strong>Верно.</strong> Отклонение описывает состояние параметра, причины — конкретный элемент и механизм. Сценарий записан в таблицу.`;
+    return;
+  }
+  if (st.revealed) {
+    const devOk = t.options.find(o => o.correct);
+    const causesOk = t.causes.filter(c => c.correct);
+    fb.hidden = false;
+    fb.className = 'feedback hint';
+    fb.innerHTML = `
+      <strong>Правильный ответ показан и записан в таблицу.</strong>
+      <ul>
+        <li><b>Отклонение:</b> ${esc(devOk.text)}</li>
+        ${causesOk.map(c => `<li><b>Причина:</b> ${esc(c.text)}</li>`).join('')}
+      </ul>
+      При повторном прохождении попробуйте справиться с этим сценарием самостоятельно.`;
+    return;
+  }
+  if (!st.attempted) {
+    fb.hidden = true;
+    return;
+  }
+
+  const parts = [];
+  if (st.badDev) {
+    parts.push(`<li><b>Отклонение:</b> «${esc(t.options[st.dev].text)}» — ${esc(t.options[st.dev].why)}</li>`);
+  }
+  st.badCauses.forEach(i => {
+    parts.push(`<li><b>Причина:</b> «${esc(t.causes[i].text)}» — ${esc(t.causes[i].why)}</li>`);
+  });
+
+  fb.hidden = false;
+  fb.className = 'feedback err';
+  fb.innerHTML = `<strong>Пока не зачтено.</strong> Исправьте выбор:<ul>${parts.join('')}</ul>`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Действия                                                           */
+/* ------------------------------------------------------------------ */
+function onDevClick(i) {
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  st.dev = i;
+  st.badDev = false;
+  st.attempted = false;
+  render();
+}
+
+function onCauseClick(i) {
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  if (st.causes.has(i)) st.causes.delete(i);
+  else if (st.causes.size < 2) st.causes.add(i);
+  else return;
+  st.badCauses = new Set();
+  st.attempted = false;
+  render();
+}
+
+function onCheck() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  if (st.dev === null || st.causes.size === 0) return;
+
+  st.attempted = true;
+  st.badDev = !t.options[st.dev].correct;
+  st.badCauses = new Set([...st.causes].filter(i => !t.causes[i].correct));
+
+  if (!st.badDev && st.badCauses.size === 0) st.passed = true;
+
+  render();
+
+  const fb = $('fb');
+  if (fb && !fb.hidden) fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function onReveal() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+
+  // Подставляем правильные ответы и сразу отправляем в таблицу
+  st.revealed = true;
+  st.attempted = false;
+  st.badDev = false;
+  st.badCauses = new Set();
+  st.dev = t.options.findIndex(o => o.correct);
+  st.causes = new Set(
+    t.causes.map((c, i) => c.correct ? i : -1).filter(i => i >= 0)
+  );
+
+  render();
+
+  const fb = $('fb');
+  if (fb && !fb.hidden) fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function onBack() {
+  if (idx === 0) return;
+  idx--;
+  render();
+  scrollTop();
+}
+
+function onNext() {
+  if (idx < TASKS.length - 1) {
+    idx++;
+    render();
+    scrollTop();
+  } else {
+    renderFinal();
+    scrollTop();
+  }
+}
+
+function onRestart() {
+  initStates();
+  render();
+  scrollTop();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Итоговая таблица                                                   */
+/* ------------------------------------------------------------------ */
+function renderFinal() {
+  $('progress').innerHTML = TASKS.map((_, i) => {
+    let cls = '';
+    if (states[i].passed) cls = 'done';
+    else if (states[i].revealed) cls = 'revealed';
+    return `<span class="dot ${cls}"></span>`;
+  }).join('');
+
+  const passedIdx = [];
+  const revealedIdx = [];
+  const notPassedIdx = [];
+  states.forEach((s, i) => {
+    if (s.passed) passedIdx.push(i);
+    else if (s.revealed) revealedIdx.push(i);
+    else notPassedIdx.push(i);
+  });
+
+  const buildRow = (i, revealed) => {
+    const s = states[i];
+    const t = TASKS[i];
+    const causes = [...s.causes].map(ci => t.causes[ci].text).join('; ');
+    return `<tr class="${revealed ? 'revealed-row' : ''}">
+      <td class="num">${i + 1}</td>
+      <td>${esc(t.parameter)}</td>
+      <td>${esc(t.guideWord)}</td>
+      <td>${esc(t.options[s.dev].text)}</td>
+      <td>${esc(causes)}${revealed ? ' <span class="reveal-tag">✱ ответ показан</span>' : ''}</td>
+    </tr>`;
+  };
+
+  const rows = passedIdx.map(i => buildRow(i, false)).join('')
+    + revealedIdx.map(i => buildRow(i, true)).join('');
+
+  const tableHtml = rows
+    ? `<div class="table-wrap">
+         <table>
+           <thead><tr>
+             <th></th><th>Параметр</th><th>Ключевое слово</th><th>Отклонение</th><th>Причина</th>
+           </tr></thead>
+           <tbody>${rows}</tbody>
+         </table>
+       </div>
+       ${revealedIdx.length ? `<p class="closing">✱ — правильный ответ был показан кнопкой. Этот сценарий стоит пройти самостоятельно.</p>` : ''}`
+    : `<p class="closing">Проверенных сценариев пока нет — вернитесь и проверьте хотя бы один.</p>`;
+
+  const statHtml = `
+    <div class="stat">
+      <span>Проверено: ${passedIdx.length} из ${TASKS.length}</span>
+      ${revealedIdx.length ? `<span>Показано: ${revealedIdx.length}</span>` : ''}
+      <span>Отклонений: ${passedIdx.length + revealedIdx.length}</span>
+    </div>`;
+
+  const bottomHtml = notPassedIdx.length
+    ? `<p class="closing">Не разобрано: сценарии ${notPassedIdx.map(i => i + 1).join(', ')}.</p>
+       <div class="nav">
+         <button class="btn primary" id="returnBtn" data-i="${notPassedIdx[0]}">Вернуться к сценарию ${notPassedIdx[0] + 1}</button>
+         <button class="btn ghost" id="restartBtn">Пройти заново</button>
+       </div>`
+    : `<div class="closing">
+         ${revealedIdx.length
+           ? `Все сценарии разобраны. Часть ответов была показана — при повторном прохождении попробуйте справиться с ними самостоятельно.`
+           : `Все сценарии проверены. Обратите внимание: в графе «отклонение» нет причины,
+              а в графе «причина» — последствия. Именно так таблица становится проверяемой:
+              её можно перечитать, повторить и взять за основу — от корректировки проекта
+              до регламентов и ПМЛА.`}
+       </div>
+       <div class="nav">
+         <button class="btn ghost" id="backToScen">← К сценариям</button>
+         <button class="btn primary" id="restartBtn">Пройти заново</button>
+       </div>`;
+
+  $('stage').innerHTML = `
+    <div class="final">
+      <div class="scenario-head">
+        <span class="step-tag">Результат</span>
+        <span class="node">${passedIdx.length + revealedIdx.length} из ${TASKS.length} разобрано</span>
+      </div>
+      <h2>Рабочая таблица HAZOP</h2>
+      <p class="lead">Записаны проверенные сценарии. Дальше группа добавляет последствия,
+        меры защиты и предварительную критичность.</p>
+
+      ${statHtml}
+
+      ${tableHtml}
+      ${bottomHtml}
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Делегирование кликов                                               */
+/* ------------------------------------------------------------------ */
+$('stage').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn || btn.disabled) return;
+
+  switch (btn.id) {
+    case 'checkBtn':   return onCheck();
+    case 'hintBtn':    return onReveal();
+    case 'backBtn':    return onBack();
+    case 'nextBtn':    return onNext();
+    case 'restartBtn': return onRestart();
+    case 'backToScen': idx = TASKS.length - 1; render(); scrollTop(); return;
+    case 'returnBtn':  idx = +btn.dataset.i; render(); scrollTop(); return;
+  }
+
+  if (btn.classList.contains('option')) {
+    if (btn.closest('#options1')) return onDevClick(+btn.dataset.i);
+    if (btn.closest('#options2')) return onCauseClick(+btn.dataset.i);
+  }
+});
+
+/* ------------------------------------------------------------------ */
+initStates();
+render();
+</script>
+</body>
+</html>
