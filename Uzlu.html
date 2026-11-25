@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Разбиение ОПО на узлы — интерактивный тренажёр</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#ffffff}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    color:#1e3a8a;line-height:1.45;-webkit-font-smoothing:antialiased;
+    display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:16px;
+  }
+  .wrap{
+    width:700px;max-height:1000px;overflow-y:auto;
+    background:#ffffff;border-radius:16px;padding:20px 18px 28px;
+    border:1px solid #dbeafe;
+  }
+  .wrap::-webkit-scrollbar{width:8px}
+  .wrap::-webkit-scrollbar-thumb{background:#bfdbfe;border-radius:4px}
+
+  header h1{font-size:20px;margin:0 0 12px;letter-spacing:-.3px;line-height:1.25;color:#1e40af}
+
+  /* ---- Табы ---- */
+  .tabs{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+  .tabs button{
+    flex:1;padding:9px 12px;border-radius:9px;border:1px solid #bfdbfe;background:#ffffff;cursor:pointer;
+    font-size:13px;font-weight:600;color:#1e40af;transition:.15s;font-family:inherit;
+  }
+  .tabs button:hover{border-color:#60a5fa;background:#eff6ff}
+  .tabs button.active{background:#2563eb;border-color:#2563eb;color:#ffffff}
+
+  .panel{display:none;animation:fade .2s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+  /* ---- Задание ---- */
+  .task-box{
+    background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin-bottom:12px;
+  }
+  .task-box h2{font-size:14px;margin:0 0 6px;text-transform:uppercase;letter-spacing:.3px;color:#1e40af}
+  .task-box p{margin:0 0 6px;font-size:13px;color:#1e3a8a}
+  .task-box ul{margin:4px 0 0;padding-left:18px;font-size:12.5px;color:#334155}
+  .task-box li{margin:2px 0}
+  .task-box b{color:#1e40af}
+
+  /* ---- Панель действий ---- */
+  .bar{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+    background:#ffffff;border:1px solid #bfdbfe;border-radius:11px;padding:8px 12px;margin-bottom:12px;
+  }
+  .progress{font-size:12px;font-weight:600;color:#1e40af}
+  .bar-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+  .btn{
+    padding:7px 12px;border-radius:8px;border:1px solid #bfdbfe;background:#ffffff;color:#1e40af;
+    font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit;
+    white-space:nowrap;
+  }
+  .btn:hover{background:#eff6ff;border-color:#60a5fa}
+  .btn.primary{background:#2563eb;border-color:#2563eb;color:#ffffff}
+  .btn.primary:hover{background:#1d4ed8}
+  .btn.ghost{color:#3b82f6}
+
+  /* ---- Карточки оборудования (базовый) ---- */
+  .pool{background:#ffffff;border:1px solid #bfdbfe;border-radius:12px;padding:10px;margin-bottom:12px}
+  .pool-head{font-size:11px;font-weight:700;color:#1e40af;margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px}
+  .pool-body{
+    display:flex;flex-wrap:wrap;gap:6px;min-height:70px;padding:8px;border-radius:8px;
+    background:#f8fbff;border:2px dashed #bfdbfe;transition:.15s;align-content:flex-start;
+  }
+  .pool-body:empty::before{
+    content:'Всё оборудование распределено по узлам';color:#93c5fd;font-size:12px;font-style:italic;
+  }
+  .pool-body.dragover{background:#eff6ff;border-color:#60a5fa}
+
+  .chip{
+    display:flex;flex-direction:column;gap:1px;padding:5px 8px;border-radius:8px;
+    background:#ffffff;border:1.5px solid #bfdbfe;cursor:grab;user-select:none;transition:.12s;
+    min-width:78px;max-width:120px;
+  }
+  .chip:hover{border-color:#60a5fa;box-shadow:0 2px 6px rgba(37,99,235,.12)}
+  .chip:active{cursor:grabbing}
+  .chip.dragging{opacity:.4}
+  .chip.selected{
+    border-color:#2563eb;background:#dbeafe;box-shadow:0 0 0 3px rgba(37,99,235,.2);
+  }
+  .chip-code{font-size:11px;font-weight:800;color:#1e40af;letter-spacing:.2px}
+  .chip-name{font-size:10px;color:#3b82f6;line-height:1.2}
+
+  /* ---- Зоны узлов (базовый) ---- */
+  .zones{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .zone{
+    background:#ffffff;border:1px solid #bfdbfe;border-radius:12px;overflow:hidden;
+    border-top:3px solid var(--node-color);transition:.2s;display:flex;flex-direction:column;
+  }
+  .zone.ok{box-shadow:0 0 0 3px rgba(22,163,74,.2)}
+  .zone.err{box-shadow:0 0 0 3px rgba(220,38,38,.18)}
+  .zone-head{padding:9px 11px 4px;font-size:12px;font-weight:700;color:#1e40af;line-height:1.25}
+  .zone-hint{padding:0 11px 7px;font-size:10.5px;color:#60a5fa;line-height:1.3}
+  .zone-body{
+    flex:1;display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;
+    padding:8px 10px;min-height:90px;background:#f8fbff;border-top:1px dashed #dbeafe;
+    transition:.15s;cursor:pointer;
+  }
+  .zone-body:empty::before{
+    content:'Кликните здесь или перетащите карточку';color:#93c5fd;font-size:11px;font-style:italic;
+  }
+  .zone-body.dragover{background:#eff6ff}
+  .zone-body .chip{border-color:var(--node-color);background:color-mix(in srgb, var(--node-color) 8%, #ffffff)}
+  .zone-body .chip .chip-code{color:var(--node-color)}
+
+  /* ---- Схема (средний) ---- */
+  .scheme-wrap{
+    background:#ffffff;border:1px solid #bfdbfe;border-radius:12px;padding:6px;margin-bottom:10px;
+    overflow:hidden;
+  }
+  .scheme{position:relative;width:660px;height:420px}
+  .scheme svg{position:absolute;inset:0;pointer-events:none}
+  .med-chip{
+    position:absolute;transform:translate(-50%,-50%);width:80px;height:50px;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;
+    padding:3px 3px;border-radius:8px;background:#ffffff;border:1.5px solid #bfdbfe;
+    cursor:pointer;user-select:none;transition:.12s;text-align:center;z-index:2;
+  }
+  .med-chip:hover{border-color:#60a5fa;box-shadow:0 2px 8px rgba(37,99,235,.15)}
+  .med-chip.selected{
+    border-color:#2563eb !important;box-shadow:0 0 0 3px rgba(37,99,235,.22);z-index:3;
+  }
+  .med-chip .chip-code{font-size:10px;font-weight:800;color:#1e40af}
+  .med-chip .chip-name{font-size:8px;color:#3b82f6;line-height:1.15;padding:0 1px;overflow:hidden}
+
+  /* ---- Список созданных узлов ---- */
+  .groups{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .group-row{
+    display:flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #bfdbfe;
+    border-radius:8px;padding:7px 10px;font-size:12px;
+  }
+  .group-swatch{width:12px;height:12px;border-radius:3px;flex:none}
+  .group-items{flex:1;color:#1e40af;font-weight:600;font-size:11.5px}
+  .group-count{font-size:10.5px;color:#60a5fa;font-weight:600}
+  .group-del{
+    border:none;background:#eff6ff;color:#3b82f6;width:22px;height:22px;border-radius:5px;
+    cursor:pointer;font-size:14px;line-height:1;flex:none;transition:.15s;font-family:inherit;
+  }
+  .group-del:hover{background:#fee2e2;color:#dc2626}
+  .groups-empty{
+    font-size:12px;color:#93c5fd;font-style:italic;padding:8px 2px;
+  }
+
+  /* ---- Обратная связь ---- */
+  .feedback{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+  .fb-item{
+    display:flex;gap:8px;align-items:flex-start;padding:9px 11px;border-radius:9px;
+    font-size:12.5px;line-height:1.4;border:1px solid transparent;
+  }
+  .fb-item .ico{flex:none;font-size:14px;line-height:1.3}
+  .fb-item.ok{background:#f0fdf4;border-color:#bbf7d0;color:#14532d}
+  .fb-item.warn{background:#fffbeb;border-color:#fde68a;color:#78350f}
+  .fb-item.err{background:#fef2f2;border-color:#fecaca;color:#7f1d1d}
+  .fb-item.info{background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a}
+  .fb-item b{font-weight:700}
+  .fb-item code{
+    background:rgba(37,99,235,.08);padding:1px 4px;border-radius:3px;font-size:11.5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  .summary{font-weight:700;font-size:13px}
+
+  details.expl{background:#ffffff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 13px;margin-top:4px}
+  details.expl summary{cursor:pointer;font-weight:700;font-size:12.5px;color:#1e40af}
+  details.expl ul{margin:8px 0 0;padding-left:16px;font-size:12px;color:#334155}
+  details.expl li{margin:6px 0}
+  details.expl b{color:#1e40af}
+
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:#3b82f6;padding:0 2px 8px}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Поиск слабых мест: разбиваем объект на узлы</h1>
+  </header>
+
+  <div class="tabs">
+    <button data-level="basic" class="active">Базовый уровень</button>
+    <button data-level="medium">Средний уровень</button>
+  </div>
+
+  <!-- ================= БАЗОВЫЙ ================= -->
+  <section class="panel active" id="panel-basic">
+    <div class="task-box">
+      <h2>Задание</h2>
+      <p>Распределите оборудование по четырём узлам. <b>Узел</b> — функционально связанная группа, у которой есть общие параметры (давление, температура, расход) и границы.</p>
+      <ul>
+        <li>Перетащите карточку в узел или кликните по карточке, а затем по месту в узле.</li>
+        <li>Обвязка (арматура, КИП) входит в узел того аппарата, с которым связана.</li>
+      </ul>
+    </div>
+
+    <div class="bar">
+      <span class="progress" id="basicProgress">Распределено: 0 из 18</span>
+      <div class="bar-actions">
+        <button class="btn primary" id="basicCheck">Проверить</button>
+        <button class="btn ghost" id="basicReset">Сбросить</button>
+      </div>
+    </div>
+
+    <div class="pool">
+      <div class="pool-head">Оборудование схемы</div>
+      <div class="pool-body" id="poolBody"></div>
+    </div>
+
+    <div class="zones" id="zones"></div>
+    <div class="feedback" id="fbBasic"></div>
+  </section>
+
+  <!-- ================= СРЕДНИЙ ================= -->
+  <section class="panel" id="panel-medium">
+    <div class="task-box">
+      <h2>Задание</h2>
+      <p>Самостоятельно разбейте схему на логические узлы: выделяйте элементы кликом и создавайте узлы. Каждый элемент должен попасть ровно в один узел.</p>
+      <ul>
+        <li>В узле — не менее двух элементов.</li>
+        <li>Граница узла — отсекающая арматура, а не «середина» аппарата.</li>
+      </ul>
+    </div>
+
+    <div class="bar">
+      <span class="progress" id="medProgress">Выделено: 0 · Узлов: 0</span>
+      <div class="bar-actions">
+        <button class="btn primary" id="medMake">Создать узел</button>
+        <button class="btn" id="medClearSel">Снять</button>
+        <button class="btn primary" id="medCheck">Проверить</button>
+        <button class="btn ghost" id="medReset">Сбросить</button>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i style="background:#2563eb"></i> узел 1</span>
+      <span><i style="background:#0d9488"></i> узел 2</span>
+      <span><i style="background:#7c3aed"></i> узел 3</span>
+      <span><i style="background:#b45309"></i> узел 4</span>
+    </div>
+
+    <div class="scheme-wrap">
+      <div class="scheme" id="scheme"></div>
+    </div>
+
+    <div class="groups" id="groupsList"></div>
+    <div class="feedback" id="fbMed"></div>
+  </section>
+
+</div>
+
+<script>
+/* =========================================================
+   ДАННЫЕ
+   ========================================================= */
+const NODES = [
+  { id:1, color:'#2563eb', title:'Узел 1. Сырьевой насос с обвязкой',
+    hint:'Насос, фильтр, обратный клапан, отсекающая арматура, манометр',
+    why:'Функционально связанная группа: отклонения по расходу и давлению на входе насоса влияют на весь процесс. Границы узла — входная (З-1) и выходная (З-2) задвижки.' },
+  { id:2, color:'#0d9488', title:'Узел 2. Теплообменник с байпасом',
+    hint:'Теплообменник, байпасная линия, регулирующий клапан, датчик температуры',
+    why:'Узел регулирования теплового режима. Байпас с регулирующим клапаном — часть узла, иначе нельзя оценить отклонение по температуре.' },
+  { id:3, color:'#7c3aed', title:'Узел 3. Реактор с системой подачи',
+    hint:'Реактор, клапан-отсекатель, предохранительный клапан, датчик давления',
+    why:'Ключевой аппарат с опасными параметрами. Защитная арматура и КИП — часть узла.' },
+  { id:4, color:'#b45309', title:'Узел 4. Колонна с кубовой частью',
+    hint:'Колонна, кипятильник, конденсатор, флегмовая ёмкость',
+    why:'Массообменный узел: параметры колонны, куба и дефлегматора взаимосвязаны и анализируются вместе.' }
+];
+
+const EQUIPMENT = [
+  { id:'z1',  code:'З-1',  name:'Задвижка входная',          node:1, x:60,  y:60 },
+  { id:'f1',  code:'Ф-1',  name:'Фильтр',                    node:1, x:60,  y:140 },
+  { id:'n1',  code:'Н-1',  name:'Насос',                     node:1, x:60,  y:220 },
+  { id:'ko1', code:'КО-1', name:'Обратный клапан',           node:1, x:60,  y:300 },
+  { id:'z2',  code:'З-2',  name:'Задвижка выходная',         node:1, x:60,  y:380 },
+  { id:'m1',  code:'М-1',  name:'Манометр',                  node:1, x:160, y:220 },
+
+  { id:'t1',  code:'Т-1',  name:'Теплообменник',             node:2, x:240, y:220 },
+  { id:'b1',  code:'Б-1',  name:'Байпасная линия',           node:2, x:240, y:140 },
+  { id:'kr1', code:'КР-1', name:'Регулирующий клапан',       node:2, x:330, y:140 },
+  { id:'dt1', code:'ДТ-1', name:'Датчик температуры',        node:2, x:330, y:220 },
+
+  { id:'r1',  code:'Р-1',  name:'Реактор',                   node:3, x:420, y:220 },
+  { id:'ko2', code:'КО-2', name:'Клапан-отсекатель',         node:3, x:420, y:140 },
+  { id:'pk1', code:'ПК-1', name:'Предохранительный клапан',  node:3, x:420, y:300 },
+  { id:'dd1', code:'ДД-1', name:'Датчик давления',           node:3, x:510, y:220 },
+
+  { id:'k1',  code:'К-1',  name:'Колонна',                   node:4, x:610, y:220 },
+  { id:'i1',  code:'И-1',  name:'Кипятильник',               node:4, x:610, y:300 },
+  { id:'h1',  code:'Х-1',  name:'Конденсатор',               node:4, x:610, y:140 },
+  { id:'e1',  code:'Е-1',  name:'Флегмовая ёмкость',         node:4, x:610, y:380 }
+];
+
+const LINES = [
+  'M60,83 V107', 'M60,163 V187', 'M60,243 V277', 'M60,323 V357',
+  'M100,220 H120',
+  'M240,163 V197',
+  'M280,140 H290',
+  'M330,163 V197',
+  'M420,163 V197',
+  'M420,243 V277',
+  'M460,220 H470',
+  'M610,163 V197',
+  'M610,243 V277',
+  'M610,323 V357',
+  'M100,380 H180 V220 H200',
+  'M280,220 H380',
+  'M550,220 H570'
+];
+
+const MED_COLORS = ['#2563eb','#0d9488','#7c3aed','#b45309'];
+
+/* =========================================================
+   ХЕЛПЕРЫ
+   ========================================================= */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const eqById   = id => EQUIPMENT.find(e => e.id === id);
+const nodeById = id => NODES.find(n => n.id === id);
+const refIds   = nid => EQUIPMENT.filter(e => e.node === nid).map(e => e.id);
+const codesOf  = ids => ids.map(i => eqById(i).code).join(', ');
+
+function shuffle(a){
+  const r = a.slice();
+  for (let i = r.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [r[i], r[j]] = [r[j], r[i]];
+  }
+  return r;
+}
+function hexToRgba(hex, a){
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function fbItem(container, type, icon, html){
+  const d = document.createElement('div');
+  d.className = 'fb-item ' + type;
+  d.innerHTML = `<span class="ico">${icon}</span><div>${html}</div>`;
+  container.appendChild(d);
+  return d;
+}
+
+/* =========================================================
+   ПЕРЕКЛЮЧЕНИЕ ТАБОВ
+   ========================================================= */
+$$('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.tabs button').forEach(b => b.classList.toggle('active', b === btn));
+    $$('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + btn.dataset.level));
+  });
+});
+
+/* =========================================================
+   БАЗОВЫЙ УРОВЕНЬ
+   ========================================================= */
+let dragId = null;
+
+function makeChip(eq){
+  const el = document.createElement('div');
+  el.className = 'chip';
+  el.draggable = true;
+  el.dataset.id = eq.id;
+  el.innerHTML = `<span class="chip-code">${eq.code}</span><span class="chip-name">${eq.name}</span>`;
+
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    el.classList.toggle('selected');
+  });
+  el.addEventListener('dragstart', e => {
+    dragId = eq.id;
+    e.dataTransfer.setData('text/plain', eq.id);
+    e.dataTransfer.effectAllowed = 'move';
+    el.classList.add('dragging');
+  });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    dragId = null;
+  });
+  return el;
+}
+
+function moveSelectedTo(target){
+  const sel = $$('#panel-basic .chip.selected');
+  if (!sel.length) return;
+  sel.forEach(c => { c.classList.remove('selected'); target.appendChild(c); });
+  updateBasicProgress();
+}
+
+function attachDrop(zoneEl, bodyEl){
+  zoneEl.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    bodyEl.classList.add('dragover');
+  });
+  zoneEl.addEventListener('dragleave', e => {
+    if (!zoneEl.contains(e.relatedTarget)) bodyEl.classList.remove('dragover');
+  });
+  zoneEl.addEventListener('drop', e => {
+    e.preventDefault();
+    bodyEl.classList.remove('dragover');
+    const id = e.dataTransfer.getData('text/plain') || dragId;
+    const chip = document.querySelector(`#panel-basic .chip[data-id="${id}"]`);
+    if (chip) { bodyEl.appendChild(chip); updateBasicProgress(); }
+  });
+  zoneEl.addEventListener('click', e => {
+    if (e.target.closest('.chip')) return;
+    moveSelectedTo(bodyEl);
+  });
+}
+
+function initBasic(){
+  const poolBody = $('#poolBody');
+  const zonesEl  = $('#zones');
+  poolBody.innerHTML = '';
+  zonesEl.innerHTML = '';
+
+  shuffle(EQUIPMENT).forEach(eq => poolBody.appendChild(makeChip(eq)));
+  attachDrop(poolBody.closest('.pool'), poolBody);
+
+  NODES.forEach(n => {
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    zone.dataset.node = n.id;
+    zone.style.setProperty('--node-color', n.color);
+    zone.innerHTML = `
+      <div class="zone-head">${n.title}</div>
+      <div class="zone-hint">${n.hint}</div>
+      <div class="zone-body"></div>`;
+    zonesEl.appendChild(zone);
+    const body = zone.querySelector('.zone-body');
+    attachDrop(zone, body);
+  });
+
+  $('#fbBasic').innerHTML = '';
+  updateBasicProgress();
+}
+
+function updateBasicProgress(){
+  const inZones = $$('#zones .chip').length;
+  $('#basicProgress').textContent = `Распределено: ${inZones} из ${EQUIPMENT.length}`;
+}
+
+function clearBasicMarks(){
+  $$('#panel-basic .zone').forEach(z => z.classList.remove('ok','err'));
+}
+
+function checkBasic(){
+  clearBasicMarks();
+  const fb = $('#fbBasic');
+  fb.innerHTML = '';
+
+  let perfect = true;
+  const results = [];
+
+  NODES.forEach(n => {
+    const zone   = document.querySelector(`.zone[data-node="${n.id}"]`);
+    const body   = zone.querySelector('.zone-body');
+    const ids    = [...body.querySelectorAll('.chip')].map(c => c.dataset.id);
+    const ref    = refIds(n.id);
+    const extra  = ids.filter(i => !ref.includes(i));
+    const missing= ref.filter(i => !ids.includes(i));
+    const isOk   = extra.length === 0 && missing.length === 0;
+    if (!isOk) perfect = false;
+    zone.classList.add(isOk ? 'ok' : 'err');
+    results.push({ n, ids, extra, missing, isOk });
+  });
+
+  const leftover = [...$('#poolBody').querySelectorAll('.chip')].map(c => c.dataset.id);
+  if (leftover.length) perfect = false;
+
+  if (perfect){
+    fbItem(fb, 'ok', '✅',
+      '<span class="summary">Отлично! Разбиение совпадает с эталонным.</span><br>' +
+      'Выделены четыре функционально связанных узла с корректными границами — такую схему можно передавать в HAZOP.');
+  } else {
+    fbItem(fb, 'warn', '⚠️',
+      '<span class="summary">Разбиение требует доработки.</span><br>' +
+      'Ориентируйтесь на принцип: узел — группа оборудования с общими параметрами и границами.');
+  }
+
+  results.forEach(r => {
+    if (r.isOk){
+      fbItem(fb, 'ok', '✅', `<b>${r.n.title}</b> — верно (${r.ids.length} элем.).`);
+    } else {
+      let msg = `<b>${r.n.title}</b> — не совпадает с эталоном.<br>`;
+      if (r.extra.length)   msg += `Лишние: <code>${codesOf(r.extra)}</code> — относятся к другому узлу.<br>`;
+      if (r.missing.length) msg += `Не хватает: <code>${codesOf(r.missing)}</code>.<br>`;
+      msg += `<i>${r.n.why}</i>`;
+      fbItem(fb, 'err', '❌', msg);
+    }
+  });
+
+  if (leftover.length){
+    fbItem(fb, 'warn', '⚠️',
+      `Не распределены: <code>${codesOf(leftover)}</code>. Каждый элемент должен входить в узел.`);
+  }
+
+  if (!perfect){
+    const d = document.createElement('details');
+    d.className = 'expl';
+    d.innerHTML = '<summary>Показать логику эталонного разбиения</summary><ul>' +
+      NODES.map(n => `<li><b>${n.title}</b> (${codesOf(refIds(n.id))}) — ${n.why}</li>`).join('') +
+      '</ul>';
+    fb.appendChild(d);
+  }
+
+  fb.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+$('#basicCheck').addEventListener('click', checkBasic);
+$('#basicReset').addEventListener('click', () => initBasic());
+
+/* =========================================================
+   СРЕДНИЙ УРОВЕНЬ
+   ========================================================= */
+const medState = { selected: new Set(), groups: [] };
+
+function buildScheme(){
+  const scheme = $('#scheme');
+  scheme.innerHTML = '';
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 660 420');
+  svg.setAttribute('width', '660');
+  svg.setAttribute('height', '420');
+  LINES.forEach(d => {
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', '#93c5fd');
+    p.setAttribute('stroke-width', '2');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p);
+  });
+  scheme.appendChild(svg);
+
+  EQUIPMENT.forEach(eq => {
+    const el = document.createElement('div');
+    el.className = 'med-chip';
+    el.dataset.id = eq.id;
+    el.style.left = eq.x + 'px';
+    el.style.top  = eq.y + 'px';
+    el.title = eq.code + ' — ' + eq.name;
+    el.innerHTML = `<span class="chip-code">${eq.code}</span><span class="chip-name">${eq.name}</span>`;
+    el.addEventListener('click', () => {
+      if (medState.selected.has(eq.id)) medState.selected.delete(eq.id);
+      else medState.selected.add(eq.id);
+      paintMed();
+    });
+    scheme.appendChild(el);
+  });
+}
+
+function paintMed(){
+  EQUIPMENT.forEach(eq => {
+    const el = document.querySelector(`.med-chip[data-id="${eq.id}"]`);
+    if (!el) return;
+    el.classList.toggle('selected', medState.selected.has(eq.id));
+    const gi = medState.groups.findIndex(g => g.ids.includes(eq.id));
+    if (gi >= 0){
+      const c = medState.groups[gi].color;
+      el.style.background  = hexToRgba(c, 0.14);
+      el.style.borderColor = c;
+    } else {
+      el.style.background  = '';
+      el.style.borderColor = '';
+    }
+  });
+
+  const list = $('#groupsList');
+  list.innerHTML = '';
+  if (!medState.groups.length){
+    list.innerHTML = '<div class="groups-empty">Узлы пока не созданы. Выделите элементы и нажмите «Создать узел».</div>';
+  } else {
+    medState.groups.forEach((g, i) => {
+      const row = document.createElement('div');
+      row.className = 'group-row';
+      row.innerHTML = `
+        <span class="group-swatch" style="background:${g.color}"></span>
+        <span class="group-items">${codesOf(g.ids)}</span>
+        <span class="group-count">${g.ids.length} эл.</span>
+        <button class="group-del" title="Расформировать">×</button>`;
+      row.querySelector('.group-del').addEventListener('click', () => {
+        medState.groups.splice(i, 1);
+        paintMed();
+      });
+      list.appendChild(row);
+    });
+  }
+
+  const assigned = new Set(medState.groups.flatMap(g => g.ids)).size;
+  $('#medProgress').textContent =
+    `Выделено: ${medState.selected.size} · Распределено: ${assigned} из ${EQUIPMENT.length} · Узлов: ${medState.groups.length}`;
+}
+
+function medMakeNode(){
+  const ids = [...medState.selected];
+  const fb = $('#fbMed');
+  fb.innerHTML = '';
+
+  if (ids.length < 2){
+    fbItem(fb, 'warn', '⚠️',
+      'В узле должно быть минимум два элемента. Одиночный аппарат без обвязки — ещё не узел.');
+    return;
+  }
+
+  medState.groups.forEach(g => { g.ids = g.ids.filter(i => !ids.includes(i)); });
+  medState.groups = medState.groups.filter(g => g.ids.length > 0);
+
+  medState.groups.push({
+    color: MED_COLORS[medState.groups.length % MED_COLORS.length],
+    ids: ids.slice()
+  });
+
+  medState.selected.clear();
+  paintMed();
+}
+
+function medCheck(){
+  const fb = $('#fbMed');
+  fb.innerHTML = '';
+
+  if (!medState.groups.length){
+    fbItem(fb, 'warn', '⚠️', 'Сначала создайте хотя бы один узел: выделите элементы и нажмите «Создать узел».');
+    return;
+  }
+
+  const refKey = {};
+  NODES.forEach(n => { refKey[refIds(n.id).slice().sort().join('|')] = n.id; });
+
+  const usedRefs = new Set();
+  let perfect = true;
+  const matchedNodes = [];
+
+  medState.groups.forEach(g => {
+    const key = g.ids.slice().sort().join('|');
+    const refNodeId = refKey[key];
+
+    if (refNodeId !== undefined && !usedRefs.has(refNodeId)){
+      usedRefs.add(refNodeId);
+      matchedNodes.push(refNodeId);
+      const n = nodeById(refNodeId);
+      fbItem(fb, 'ok', '✅',
+        `<b>Узел «${codesOf(g.ids)}» — верно.</b> Это ${n.title}.<br><i>${n.why}</i>`);
+    } else {
+      perfect = false;
+
+      let best = null, bestScore = -1;
+      NODES.forEach(n => {
+        const ref = refIds(n.id);
+        const score = ref.filter(i => g.ids.includes(i)).length;
+        if (score > bestScore){ bestScore = score; best = n; }
+      });
+
+      const ref = refIds(best.id);
+      const extra   = g.ids.filter(i => !ref.includes(i));
+      const missing = ref.filter(i => !g.ids.includes(i));
+
+      let msg = `<b>Узел «${codesOf(g.ids)}» не совпадает ни с одним эталонным.</b><br>`;
+      msg += `Ближе всего к узлу «${best.title}».<br>`;
+      if (extra.length)   msg += `Лишние: <code>${codesOf(extra)}</code> — относятся к другому узлу.<br>`;
+      if (missing.length) msg += `Не хватает: <code>${codesOf(missing)}</code>.<br>`;
+      msg += `<i>${best.why}</i>`;
+      fbItem(fb, 'err', '❌', msg);
+    }
+  });
+
+  const assigned = new Set(medState.groups.flatMap(g => g.ids));
+  const unassigned = EQUIPMENT.filter(e => !assigned.has(e.id)).map(e => e.id);
+  if (unassigned.length){
+    perfect = false;
+    fbItem(fb, 'warn', '⚠️',
+      `Не вошли ни в один узел: <code>${codesOf(unassigned)}</code>.`);
+  }
+
+  if (perfect){
+    fb.innerHTML = '';
+    fbItem(fb, 'ok', '🏆',
+      '<span class="summary">Отлично! Схема разбита на четыре корректных узла.</span><br>' +
+      'Такую декомпозицию можно передавать в HAZOP: у каждого узла есть свои параметры, границы и набор отклонений.');
+    fbItem(fb, 'info', '➡️',
+      'Следующий шаг: для каждого узла выписать отклонения (больше/меньше давления, температуры, расхода), причины и барьеры безопасности.');
+  } else {
+    const notFound = NODES.filter(n => !matchedNodes.includes(n.id));
+    if (notFound.length){
+      fbItem(fb, 'info', '💡',
+        `Не выделены как отдельные узлы: ${notFound.map(n => `<b>${n.title}</b>`).join('; ')}.`);
+    }
+
+    const d = document.createElement('details');
+    d.className = 'expl';
+    d.innerHTML = '<summary>Показать эталонное разбиение и логику</summary><ul>' +
+      NODES.map(n => `<li><b>${n.title}</b> (${codesOf(refIds(n.id))}) — ${n.why}</li>`).join('') +
+      '</ul>';
+    fb.appendChild(d);
+  }
+
+  fb.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function medReset(){
+  medState.selected.clear();
+  medState.groups = [];
+  paintMed();
+  $('#fbMed').innerHTML = '';
+}
+
+$('#medMake').addEventListener('click', medMakeNode);
+$('#medClearSel').addEventListener('click', () => { medState.selected.clear(); paintMed(); });
+$('#medCheck').addEventListener('click', medCheck);
+$('#medReset').addEventListener('click', medReset);
+
+/* =========================================================
+   СТАРТ
+   ========================================================= */
+initBasic();
+buildScheme();
+paintMed();
+</script>
+</body>
+</html>
