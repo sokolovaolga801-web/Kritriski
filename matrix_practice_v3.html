@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Практика: ставим точку на матрице</title>
+<style>
+  :root{
+    --ink:#18222e; --muted:#5c6b7c;
+    --accent:#0b5fc4; --accent-soft:#e6effb;
+    --ok:#0f7a54; --ok-soft:#e2f5ec;
+    --err:#bb2736; --err-soft:#fbe9eb;
+    --violet:#6b2a9a; --violet-soft:#f3e9fb;
+    --warn:#a86400; --warn-soft:#fdf3e0;
+    --fill:#f4f7fb; --fill-hover:#e9eff8;
+  }
+  *{box-sizing:border-box}
+  html,body{background:#fff}
+  body{
+    margin:0;padding:24px;
+    color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    width:650px;max-width:100%;height:900px;overflow-y:auto;
+    margin:0 auto;padding:20px 22px 24px;
+    background:#fff;
+    scrollbar-width:thin;scrollbar-color:#d5dde8 transparent;
+  }
+  .app::-webkit-scrollbar{width:8px}
+  .app::-webkit-scrollbar-thumb{background:#d5dde8;border-radius:99px}
+  .app::-webkit-scrollbar-track{background:transparent}
+
+  h1{font-size:18px;margin:0 0 4px;line-height:1.25;letter-spacing:-.01em;font-weight:700}
+
+  .progress{display:flex;gap:6px;margin:0 0 16px}
+  .dot{height:5px;flex:1;border-radius:99px;background:#dde4ee;transition:background .3s}
+  .dot.done{background:var(--ok)}
+  .dot.revealed{background:var(--violet)}
+  .dot.active{background:var(--accent)}
+
+  .scenario-head{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .step-tag{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .node{font-size:12px;color:var(--muted);background:var(--fill);padding:3px 10px;border-radius:99px}
+
+  .context{background:var(--fill);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px}
+  .context .row{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:3px 0}
+  .context .row b{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;padding-top:1px}
+
+  .col h2{font-size:14px;margin:0 0 6px;font-weight:700;line-height:1.3}
+  .col .lead{font-size:12px;line-height:1.4;margin:0 0 8px;color:var(--muted)}
+  .step-num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:18px;height:18px;border-radius:6px;margin-right:6px;
+    background:var(--accent);color:#fff;font-size:11px;font-weight:700;vertical-align:1px;
+  }
+  .step-num-2{background:var(--violet)}
+  .step-num-3{background:var(--warn)}
+
+  .pick-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  button.pick{
+    font:inherit;text-align:left;cursor:pointer;border:0;border-radius:8px;
+    background:var(--fill);color:var(--ink);padding:7px 10px;transition:background .15s;
+  }
+  button.pick:hover:not(:disabled){background:var(--fill-hover)}
+  button.pick b{display:block;font-size:12.5px;font-weight:650;line-height:1.25}
+  button.pick small{display:block;font-size:10.5px;color:var(--muted);line-height:1.25;margin-top:2px}
+  button.pick.sel{background:var(--accent-soft);outline:2px solid var(--accent);outline-offset:-2px}
+  button.pick.right{background:var(--ok-soft)}
+  button.pick.wrong{background:var(--err-soft)}
+  button.pick:disabled{cursor:default}
+
+  .matrix{display:grid;grid-template-columns:minmax(96px,128px) repeat(4,minmax(0,1fr));gap:4px;margin-top:10px}
+  .mx-lab{font-size:10px;line-height:1.2;color:var(--muted);font-weight:700;display:flex;flex-direction:column;justify-content:center}
+  .mx-lab.col{align-items:center;text-align:center;padding:0 2px}
+  .mx-lab.row{padding-right:6px}
+  .mx-lab small{display:block;font-weight:600;font-size:9px;color:#8394a6;margin-top:1px}
+  .cell{
+    height:42px;border-radius:8px;position:relative;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;
+  }
+  .cell .lv{position:absolute;top:3px;left:6px;font-size:9.5px;opacity:.7}
+  .cell.hit{outline:2px solid var(--ink);outline-offset:-2px}
+  .cell .dotmark{
+    width:15px;height:15px;border-radius:99px;background:var(--ink);
+    box-shadow:0 0 0 3px #fff;animation:pop .18s ease-out;
+  }
+  @keyframes pop{from{transform:scale(.4);opacity:.2}to{transform:scale(1);opacity:1}}
+  .lvl-a{background:#f8d9d9;color:#b3261e}
+  .lvl-b{background:#fcf0c2;color:#8a6d00}
+  .lvl-c{background:#ddebf9;color:#1d5fa8}
+  .lvl-d{background:#f1f4f8;color:#8a97a8}
+
+  .result{margin-top:12px;padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.4;background:var(--fill)}
+  .result b{font-weight:700}
+  .result.empty{color:var(--muted);font-size:12.5px}
+
+  .matrix-note{margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.4}
+
+  .feedback{margin-top:12px;padding:11px 14px;border-radius:10px;font-size:13px;line-height:1.45}
+  .feedback.ok{background:var(--ok-soft);color:#0a5a3d}
+  .feedback.err{background:var(--err-soft);color:#8d1f2c}
+  .feedback.hint{background:var(--violet-soft);color:#4d1a73}
+  .feedback ul{margin:6px 0 0;padding-left:18px}
+  .feedback li{margin:3px 0}
+
+  .nav{display:flex;gap:8px;margin-top:16px;align-items:stretch;flex-wrap:wrap}
+  button.btn{
+    font:inherit;font-size:13.5px;font-weight:650;cursor:pointer;border:0;border-radius:9px;
+    padding:10px 14px;transition:background .15s,color .15s;white-space:nowrap;
+  }
+  button.btn.primary{background:var(--accent);color:#fff}
+  button.btn.primary:hover:not(:disabled){background:#0a53ab}
+  button.btn.ghost{background:var(--fill);color:var(--accent)}
+  button.btn.ghost:hover:not(:disabled){background:var(--fill-hover)}
+  button.btn:disabled{opacity:.45;cursor:default}
+  #checkBtn{flex:1}
+
+  .final h2{font-size:16px;margin:0 0 4px;font-weight:700}
+  .final .lead{font-size:12.5px;color:var(--muted);margin:0 0 8px;line-height:1.45}
+
+  .table-wrap{overflow-x:auto;margin-top:12px;border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:12px;min-width:620px}
+  th,td{text-align:left;padding:8px 10px;vertical-align:top;border:0;line-height:1.35}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;white-space:nowrap}
+  tbody tr:nth-child(odd){background:#f7f9fc}
+  tbody tr.revealed-row{background:var(--violet-soft)}
+  td.num{color:var(--muted);width:24px}
+  .tag-lvl{display:inline-block;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;color:#fff}
+  .tag-lvl.a{background:var(--err)}
+  .tag-lvl.b{background:#c79a00}
+  .tag-lvl.c{background:#1d5fa8}
+  .tag-lvl.d{background:#8a97a8}
+  .reveal-tag{color:var(--violet);font-size:11px;font-weight:700;white-space:nowrap}
+
+  .stat{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+  .stat span{background:var(--fill);border-radius:99px;padding:5px 12px;font-size:12.5px;font-weight:600}
+  .closing{margin-top:14px;font-size:13px;color:var(--muted);line-height:1.45}
+  [hidden]{display:none !important}
+
+  @media (max-width:600px){
+    body{padding:12px}
+    .pick-grid{grid-template-columns:1fr}
+    button.btn{flex:1 1 auto}
+    .cell{height:38px;font-size:12px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Практика: ставим точку на матрице</h1>
+    <div class="progress" id="progress" aria-hidden="true"></div>
+  <main id="stage"></main>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ */
+/*  Шкалы и матрица (по уроку и РБ № 387)                              */
+/* ------------------------------------------------------------------ */
+const FREQ = [
+  { id:'f1', label:'Частое событие',                  time:'> 1 год⁻¹ — чаще раза в год' },
+  { id:'f2', label:'Вероятное событие',               time:'до 1·10⁻² год⁻¹' },
+  { id:'f3', label:'Возможное событие',               time:'10⁻²–10⁻⁴ год⁻¹' },
+  { id:'f4', label:'Редкое событие',                  time:'10⁻⁴–10⁻⁶ год⁻¹' },
+  { id:'f5', label:'Практически невозможное событие', time:'< 10⁻⁶ год⁻¹' }
+];
+
+const SEV = [
+  { id:'s1', label:'Катастрофическое',},
+  { id:'s2', label:'Критическое',},
+  { id:'s3', label:'Некритическое',},
+  { id:'s4', label:'Пренебрежимо малые',}
+];
+
+/* строки — частота (сверху вниз), столбцы — тяжесть */
+const MATRIX = [
+  ['A','A','A','C'],      // Частое
+  ['A','A','B','C'],      // Вероятное
+  ['A','B','B','C'],      // Возможное
+  ['A','B','C', null],    // Редкое
+  ['B','C','C', null]     // Практически невозможное
+];
+
+const LEVELS = {
+  'A': { cls:'a', action:'Недопустимый риск. Работы не начинать, меры внедряются немедленно, до продолжения работы.' },
+  'B': { cls:'b', action:'Меры внедряются до продолжения работы, первоочередный приоритет.' },
+  'C': { cls:'c', action:'Допустимый риск. Достаточно контроля по действующему регламенту.' },
+  '—': { cls:'d', action:'Событие с пренебрежимо малыми последствиями. Специальных мер не требуется.' }
+};
+
+/* ------------------------------------------------------------------ */
+/*  Сценарии (из таблицы урока 2)                                      */
+/* ------------------------------------------------------------------ */
+const TASKS = [
+  {
+    node:'Линия нагнетания насоса Н-101',
+    deviation:'Больше давления в линии нагнетания',
+    cause:'Закрытие задвижки на выходе',
+    consequence:'Разгерметизация фланцев, выброс продукта',
+    freq:'f3', sev:'s2',
+    whyFreq:'Задвижку закрывают не каждый день — частота в диапазоне «Возможного» (10⁻²–10⁻⁴ год⁻¹).',
+    whySev:'Разгерметизация фланцев даёт выброс продукта — угроза жизни и существенный ущерб, это «Критическое».'
+  },
+  {
+    node:'Всасывающая линия насоса Н-101',
+    deviation:'Нет расхода при работающем насосе',
+    cause:'Засорение фильтра на всасе',
+    consequence:'Кавитация, перегрев насоса, выход из строя',
+    freq:'f2', sev:'s3',
+    whyFreq:'Фильтр засоряется регулярно — в пределах 1·10⁻² год⁻¹, это «Вероятное».',
+    whySev:'Кавитация ведёт к остановке без выброса, жизни не угрожает — «Некритическое».'
+  },
+  {
+    node:'Линия нагнетания насоса Н-101',
+    deviation:'Больше температуры перекачиваемой среды',
+    cause:'Работа насоса на закрытую задвижку',
+    consequence:'Повреждение уплотнения вала, утечка продукта',
+    freq:'f3', sev:'s2',
+    whyFreq:'Работа на закрытую задвижку — редкая операторская ошибка, в диапазоне «Возможного» (10⁻²–10⁻⁴ год⁻¹).',
+    whySev:'Утечка продукта — существенный ущерб, хотя массовой гибели нет, это «Критическое».'
+  },
+  {
+    node:'Насосный агрегат Н-101',
+    deviation:'Больше вибрации насосного агрегата',
+    cause:'Износ подшипника',
+    consequence:'Повышенный шум и вибрация, устраняются плановой регулировкой без остановки',
+    freq:'f2', sev:'s4',
+    whyFreq:'Износ подшипника — регулярное событие в пределах 1·10⁻² год⁻¹, это «Вероятное».',
+    whySev:'Шум и вибрация устраняются штатной регулировкой без остановки — последствия «пренебрежимо малые».'
+  }
+];
+
+/* ------------------------------------------------------------------ */
+/*  Утилиты и состояние                                                */
+/* ------------------------------------------------------------------ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+let states, idx;
+
+function initStates(){
+  states = TASKS.map(() => ({
+    freq:null, sev:null, passed:false, revealed:false, attempted:false
+  }));
+  idx = 0;
+}
+
+function scrollTop(){
+  const app = document.querySelector('.app');
+  if (app) app.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function levelOf(freqId, sevId){
+  const fi = FREQ.findIndex(f => f.id === freqId);
+  const si = SEV.findIndex(s => s.id === sevId);
+  if (fi < 0 || si < 0) return null;
+  return MATRIX[fi][si]; // может быть null — пустая ячейка матрицы
+}
+
+function levelKey(lv){ return lv || '—'; }
+
+/* ------------------------------------------------------------------ */
+/*  Рендер                                                             */
+/* ------------------------------------------------------------------ */
+function renderProgress(){
+  $('progress').innerHTML = TASKS.map((_, i) => {
+    let cls = '';
+    if (states[i].passed) cls = 'done';
+    else if (states[i].revealed) cls = 'revealed';
+    else if (i === idx) cls = 'active';
+    return `<span class="dot ${cls}"></span>`;
+  }).join('');
+}
+
+function matrixHtml(st){
+  const fi = FREQ.findIndex(f => f.id === st.freq);
+  const si = SEV.findIndex(s => s.id === st.sev);
+
+  let h = '<div class="matrix">';
+  h += '<div class="mx-lab col"></div>';
+  SEV.forEach(s => {
+    h += `<div class="mx-lab col">${esc(s.label)}</div>`;
+  });
+  MATRIX.forEach((row, r) => {
+    h += `<div class="mx-lab row">${esc(FREQ[r].label)}<small>${esc(FREQ[r].time)}</small></div>`;
+    row.forEach((lv, c) => {
+      const hit = r === fi && c === si;
+      const key = levelKey(lv);
+      h += `<div class="cell lvl-${LEVELS[key].cls}${hit ? ' hit' : ''}">
+              <span class="lv">${key}</span>
+              ${hit ? '<span class="dotmark"></span>' : ''}
+            </div>`;
+    });
+  });
+  h += '</div>';
+  return h;
+}
+
+function render(){
+  const t = TASKS[idx];
+  const st = states[idx];
+  renderProgress();
+
+  const locked = st.passed || st.revealed;
+  const dis = locked ? 'disabled' : '';
+  const level = levelOf(st.freq, st.sev);
+
+  const pickBtn = (group, item, isSel, isRight, isWrong) => {
+    let cls = 'pick';
+    if (isSel) cls += ' sel';
+    if (isRight) cls += ' right';
+    if (isWrong) cls += ' wrong';
+    return `<button class="${cls}" data-g="${group}" data-v="${item.id}" ${dis}>
+      <b>${esc(item.label)}</b>${item.time ? `<small>${esc(item.time)}</small>` : ''}
+    </button>`;
+  };
+
+  const freqHtml = FREQ.map(f =>
+    pickBtn('freq', f, st.freq === f.id,
+      locked && t.freq === f.id, st.attempted && st.freq === f.id && t.freq !== f.id)
+  ).join('');
+
+  const sevHtml = SEV.map(s =>
+    pickBtn('sev', s, st.sev === s.id,
+      locked && t.sev === s.id, st.attempted && st.sev === s.id && t.sev !== s.id)
+  ).join('');
+
+  const resultHtml = (st.freq && st.sev)
+    ? `<div class="result"><b>Уровень ${levelKey(level)}</b> — ${esc(LEVELS[levelKey(level)].action)}</div>`
+    : `<div class="result empty">Выберите частоту и тяжесть — точка встанет на матрицу.</div>`;
+
+  const checkLabel = st.passed ? 'Проверено ✓' : 'Проверить';
+  const checkDis = locked || !st.freq || !st.sev;
+  const isLast = idx === TASKS.length - 1;
+  const nextLabel = isLast ? 'К таблице →' : 'Далее →';
+  const hintBtn = locked ? '' : '<button class="btn ghost" id="hintBtn">Показать ответ</button>';
+
+  $('stage').innerHTML = `
+    <div class="scenario-head">
+      <span class="step-tag">Сценарий ${idx + 1} из ${TASKS.length}</span>
+      <span class="node">${esc(t.node)}</span>
+    </div>
+
+    <div class="context">
+      <div class="row"><b>Отклонение</b><span>${esc(t.deviation)}</span></div>
+      <div class="row"><b>Причина</b><span>${esc(t.cause)}</span></div>
+      <div class="row"><b>Последствие</b><span>${esc(t.consequence)}</span></div>
+    </div>
+
+    <section class="col">
+      <h2><span class="step-num">1</span>Частота по шкале времени</h2>
+      <div class="pick-grid">${freqHtml}</div>
+    </section>
+
+    <section class="col" style="margin-top:16px">
+      <h2><span class="step-num step-num-2">2</span>Тяжесть по последствиям</h2>
+      <div class="pick-grid">${sevHtml}</div>
+    </section>
+
+    <section class="col" style="margin-top:16px">
+      <h2><span class="step-num step-num-3">3</span>Точка на матрице</h2>
+      ${matrixHtml(st)}
+      ${resultHtml}
+      <p class="matrix-note">Тяжесть показывает, что произойдёт; частота — как скоро это может случиться. Точка на пересечении даёт уровень риска узла.</p>
+    </section>
+
+    <div class="feedback" id="fb" ${st.attempted || locked ? '' : 'hidden'}></div>
+
+    <div class="nav">
+      <button class="btn ghost" id="backBtn" ${idx === 0 ? 'disabled' : ''}>← Назад</button>
+      <button class="btn primary" id="checkBtn" ${checkDis ? 'disabled' : ''}>${checkLabel}</button>
+      ${hintBtn}
+      <button class="btn ${locked ? 'primary' : 'ghost'}" id="nextBtn">${nextLabel}</button>
+    </div>
+  `;
+
+  renderFeedback();
+}
+
+function renderFeedback(){
+  const t = TASKS[idx];
+  const st = states[idx];
+  const fb = $('fb');
+  if (!fb) return;
+
+  if (st.passed){
+    fb.hidden = false;
+    fb.className = 'feedback ok';
+    const lv = levelOf(t.freq, t.sev);
+    fb.innerHTML = `<strong>Верно.</strong> Уровень ${levelKey(lv)} — ${esc(LEVELS[levelKey(lv)].action)}`;
+    return;
+  }
+  if (st.revealed){
+    fb.hidden = false;
+    fb.className = 'feedback hint';
+    const f = FREQ.find(x => x.id === t.freq);
+    const s = SEV.find(x => x.id === t.sev);
+    const lv = levelOf(t.freq, t.sev);
+    fb.innerHTML = `<strong>Правильный ответ показан.</strong>
+      <ul>
+        <li><b>Частота:</b> ${esc(f.label)} — ${esc(f.time)}</li>
+        <li><b>Тяжесть:</b> ${esc(s.label)}</li>
+        <li><b>Уровень ${levelKey(lv)}:</b> ${esc(LEVELS[levelKey(lv)].action)}</li>
+      </ul>
+      При повторном прохождении попробуйте поставить точку самостоятельно.`;
+    return;
+  }
+  if (!st.attempted){
+    fb.hidden = true;
+    return;
+  }
+
+  const parts = [];
+  if (st.freq !== t.freq){
+    const f = FREQ.find(x => x.id === t.freq);
+    parts.push(`<li><b>Частота:</b> выбрано «${esc(FREQ.find(x => x.id === st.freq).label)}» — на самом деле «${esc(f.label)}». ${esc(t.whyFreq)}</li>`);
+  }
+  if (st.sev !== t.sev){
+    const s = SEV.find(x => x.id === t.sev);
+    parts.push(`<li><b>Тяжесть:</b> выбрано «${esc(SEV.find(x => x.id === st.sev).label)}» — на самом деле «${esc(s.label)}». ${esc(t.whySev)}</li>`);
+  }
+  const got = levelOf(st.freq, st.sev);
+  const want = levelOf(t.freq, t.sev);
+  if (levelKey(got) !== levelKey(want)) parts.push(`<li>Точка попала в уровень ${levelKey(got)}, а ожидается ${levelKey(want)}.</li>`);
+
+  fb.hidden = false;
+  fb.className = 'feedback err';
+  fb.innerHTML = `<strong>Пока не зачтено.</strong> Проверьте оценку:<ul>${parts.join('')}</ul>`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Действия                                                           */
+/* ------------------------------------------------------------------ */
+function onPick(group, v){
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  if (group === 'freq') st.freq = st.freq === v ? null : v;
+  else st.sev = st.sev === v ? null : v;
+  st.attempted = false;
+  render();
+}
+
+function onCheck(){
+  const t = TASKS[idx];
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  if (!st.freq || !st.sev) return;
+
+  st.attempted = true;
+  if (st.freq === t.freq && st.sev === t.sev) st.passed = true;
+  render();
+
+  const fb = $('fb');
+  if (fb && !fb.hidden) fb.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function onReveal(){
+  const t = TASKS[idx];
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+
+  st.revealed = true;
+  st.attempted = false;
+  st.freq = t.freq;
+  st.sev = t.sev;
+  render();
+
+  const fb = $('fb');
+  if (fb && !fb.hidden) fb.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function onBack(){
+  if (idx === 0) return;
+  idx--; render(); scrollTop();
+}
+
+function onNext(){
+  if (idx < TASKS.length - 1){
+    idx++; render(); scrollTop();
+  } else {
+    renderFinal(); scrollTop();
+  }
+}
+
+function onRestart(){
+  initStates(); render(); scrollTop();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Итоговая таблица                                                   */
+/* ------------------------------------------------------------------ */
+function renderFinal(){
+  $('progress').innerHTML = TASKS.map((_, i) => {
+    let cls = '';
+    if (states[i].passed) cls = 'done';
+    else if (states[i].revealed) cls = 'revealed';
+    return `<span class="dot ${cls}"></span>`;
+  }).join('');
+
+  const passedIdx = [], revealedIdx = [], notPassedIdx = [];
+  states.forEach((s, i) => {
+    if (s.passed) passedIdx.push(i);
+    else if (s.revealed) revealedIdx.push(i);
+    else notPassedIdx.push(i);
+  });
+
+  const buildRow = (i, revealed) => {
+    const t = TASKS[i];
+    const f = FREQ.find(x => x.id === t.freq);
+    const s = SEV.find(x => x.id === t.sev);
+    const lv = levelOf(t.freq, t.sev);
+    return `<tr class="${revealed ? 'revealed-row' : ''}">
+      <td class="num">${i + 1}</td>
+      <td>${esc(t.deviation)}<br><span style="color:var(--muted)">${esc(t.consequence)}</span></td>
+      <td>${esc(f.label)}<br><span style="color:var(--muted)">${esc(f.time)}</span></td>
+      <td>${esc(s.label)}</td>
+      <td><span class="tag-lvl ${LEVELS[levelKey(lv)].cls}">${levelKey(lv)}</span>
+        ${revealed ? '<br><span class="reveal-tag">✱ ответ показан</span>' : ''}</td>
+      <td>${esc(LEVELS[levelKey(lv)].action)}</td>
+    </tr>`;
+  };
+
+  const rows = passedIdx.map(i => buildRow(i, false)).join('')
+    + revealedIdx.map(i => buildRow(i, true)).join('');
+
+  const tableHtml = rows
+    ? `<div class="table-wrap">
+         <table>
+           <thead><tr>
+             <th></th><th>Сценарий</th><th>Частота</th><th>Тяжесть</th><th>Уровень</th><th>Действие</th>
+           </tr></thead>
+           <tbody>${rows}</tbody>
+         </table>
+       </div>
+       ${revealedIdx.length ? `<p class="closing">✱ — правильный ответ был показан кнопкой. Этот сценарий стоит пройти самостоятельно.</p>` : ''}`
+    : `<p class="closing">Разобранных сценариев пока нет — вернитесь и поставьте хотя бы одну точку.</p>`;
+
+  const statHtml = `
+    <div class="stat">
+      <span>Проверено: ${passedIdx.length} из ${TASKS.length}</span>
+      ${revealedIdx.length ? `<span>Показано: ${revealedIdx.length}</span>` : ''}
+    </div>`;
+
+  const bottomHtml = notPassedIdx.length
+    ? `<p class="closing">Не разобрано: сценарии ${notPassedIdx.map(i => i + 1).join(', ')}.</p>
+       <div class="nav">
+         <button class="btn primary" id="returnBtn" data-i="${notPassedIdx[0]}">Вернуться к сценарию ${notPassedIdx[0] + 1}</button>
+         <button class="btn ghost" id="restartBtn">Пройти заново</button>
+       </div>`
+    : `<div class="closing">
+         ${revealedIdx.length
+           ? `Все сценарии разобраны. Часть ответов была показана — при повторном прохождении попробуйте справиться самостоятельно.`
+           : `Все сценарии проверены. Вы научились переводить описание в точку на матрице: частота по шкале времени, тяжесть по последствиям, уровень риска на пересечении.`}
+       </div>
+       <div class="nav">
+         <button class="btn ghost" id="backToScen">← К сценариям</button>
+         <button class="btn primary" id="restartBtn">Пройти заново</button>
+       </div>`;
+
+  $('stage').innerHTML = `
+    <div class="final">
+      <div class="scenario-head">
+        <span class="step-tag">Результат</span>
+        <span class="node">${passedIdx.length + revealedIdx.length} из ${TASKS.length} разобрано</span>
+      </div>
+      <h2>Таблица оценок по матрице</h2>
+      <p class="lead">Сценарий → частота → тяжесть → уровень риска → действие.</p>
+
+      ${statHtml}
+      ${tableHtml}
+      ${bottomHtml}
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Делегирование кликов                                               */
+/* ------------------------------------------------------------------ */
+$('stage').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn || btn.disabled) return;
+
+  switch (btn.id){
+    case 'checkBtn':   return onCheck();
+    case 'hintBtn':    return onReveal();
+    case 'backBtn':    return onBack();
+    case 'nextBtn':    return onNext();
+    case 'restartBtn': return onRestart();
+    case 'backToScen': idx = TASKS.length - 1; render(); scrollTop(); return;
+    case 'returnBtn':  idx = +btn.dataset.i; render(); scrollTop(); return;
+  }
+
+  if (btn.classList.contains('pick')) return onPick(btn.dataset.g, btn.dataset.v);
+});
+
+/* ------------------------------------------------------------------ */
+initStates();
+render();
+</script>
+</body>
+</html>
