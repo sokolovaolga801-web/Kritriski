@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тренажёр HAZOP — барьеры и критичность</title>
+<style>
+  :root{
+    --ink:#18222e; --muted:#5c6b7c;
+    --accent:#0b5fc4; --accent-soft:#e6effb;
+    --ok:#0f7a54; --ok-soft:#e2f5ec;
+    --err:#bb2736; --err-soft:#fbe9eb;
+    --violet:#6b2a9a; --violet-soft:#f3e9fb;
+    --warn:#a86400; --warn-soft:#fdf3e0;
+    --fill:#f4f7fb; --fill-hover:#e9eff8;
+  }
+  *{box-sizing:border-box}
+  html,body{background:#fff}
+  body{
+    margin:0;padding:24px;
+    color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    width:700px;max-width:100%;height:900px;overflow-y:auto;
+    margin:0 auto;padding:20px 22px 24px;
+    background:#fff;
+    scrollbar-width:thin;scrollbar-color:#d5dde8 transparent;
+  }
+  .app::-webkit-scrollbar{width:8px}
+  .app::-webkit-scrollbar-thumb{background:#d5dde8;border-radius:99px}
+  .app::-webkit-scrollbar-track{background:transparent}
+
+  h1{font-size:18px;margin:0 0 14px;line-height:1.25;letter-spacing:-.01em;font-weight:700}
+
+  .progress{display:flex;gap:6px;margin:0 0 16px}
+  .dot{height:5px;flex:1;border-radius:99px;background:#dde4ee;transition:background .3s}
+  .dot.done{background:var(--ok)}
+  .dot.revealed{background:var(--violet)}
+  .dot.active{background:var(--accent)}
+
+  .scenario-head{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .step-tag{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .node{font-size:12px;color:var(--muted);background:var(--fill);padding:3px 10px;border-radius:99px}
+
+  .context{background:var(--fill);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px}
+  .context .row{display:grid;grid-template-columns:118px 1fr;gap:10px;padding:3px 0}
+  .context .row b{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;padding-top:1px}
+
+  .col h2{font-size:14px;margin:0 0 4px;font-weight:700;line-height:1.3}
+  .col .lead{font-size:12px;line-height:1.4;margin:0 0 10px;color:var(--muted)}
+  .step-num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:18px;height:18px;border-radius:6px;margin-right:6px;
+    background:var(--accent);color:#fff;font-size:11px;font-weight:700;vertical-align:1px;
+  }
+  .step-num-2{background:var(--violet)}
+  .step-num-3{background:var(--warn)}
+
+  .barrier-list{display:grid;gap:8px}
+  .barrier{
+    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    background:var(--fill);border-radius:9px;padding:9px 10px;
+  }
+  .barrier .btext{font-size:12.5px;line-height:1.35}
+  .barrier .bnote{font-size:11px;color:var(--muted);margin-top:2px}
+  .segs{display:flex;gap:4px;flex:0 0 auto}
+  button.seg{
+    font:inherit;font-size:11px;font-weight:650;cursor:pointer;border:0;border-radius:7px;
+    padding:5px 9px;background:#fff;color:var(--muted);transition:background .15s,color .15s;
+    white-space:nowrap;
+  }
+  button.seg:hover{background:#eef2f8;color:var(--ink)}
+  button.seg.sel-eng{background:var(--accent);color:#fff}
+  button.seg.sel-org{background:var(--violet);color:#fff}
+  button.seg.sel-none{background:#8a97a8;color:#fff}
+  button.seg:disabled{cursor:default;opacity:.75}
+
+  .barrier.right{background:var(--ok-soft)}
+  .barrier.wrong{background:var(--err-soft)}
+  .barrier.revealed-right{background:var(--violet-soft)}
+
+  .crit-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  button.crit{
+    font:inherit;font-size:12.5px;font-weight:650;cursor:pointer;border:0;border-radius:8px;
+    padding:9px 6px;background:var(--fill);color:var(--muted);transition:background .15s,color .15s;
+  }
+  button.crit:hover:not(:disabled){background:var(--fill-hover);color:var(--ink)}
+  button.crit.sel{color:#fff}
+  button.crit.sel[data-crit="high"]{background:var(--err)}
+  button.crit.sel[data-crit="mid"]{background:var(--warn)}
+  button.crit.sel[data-crit="low"]{background:var(--ok)}
+  button.crit.right{background:var(--ok-soft);color:#0a5a3d;font-weight:700}
+  button.crit.wrong{background:var(--err-soft);color:#8d1f2c}
+  button.crit.revealed-right{background:var(--violet-soft);color:#4d1a73;font-weight:700}
+  button.crit:disabled{cursor:default}
+
+  .just-list{display:grid;gap:5px}
+  button.just{
+    display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;line-height:1.35;
+    color:inherit;cursor:pointer;background:var(--fill);border:0;border-radius:8px;padding:8px 10px;
+    transition:background .15s;
+  }
+  button.just:hover:not(:disabled){background:var(--fill-hover)}
+  button.just.sel{background:var(--accent-soft);font-weight:650;outline:2px solid var(--accent);outline-offset:-2px}
+  button.just.right{background:var(--ok-soft);font-weight:650}
+  button.just.wrong{background:var(--err-soft)}
+  button.just.revealed-right{background:var(--violet-soft);font-weight:650}
+  button.just:disabled{cursor:default}
+
+  .feedback{margin-top:14px;padding:11px 14px;border-radius:10px;font-size:13px;border:0;line-height:1.45}
+  .feedback.ok{background:var(--ok-soft);color:#0a5a3d}
+  .feedback.err{background:var(--err-soft);color:#8d1f2c}
+  .feedback.hint{background:var(--violet-soft);color:#4d1a73}
+  .feedback ul{margin:6px 0 0;padding-left:18px}
+  .feedback li{margin:3px 0}
+
+  .nav{display:flex;gap:8px;margin-top:16px;align-items:stretch;flex-wrap:wrap}
+  button.btn{
+    font:inherit;font-size:13.5px;font-weight:650;cursor:pointer;border:0;border-radius:9px;
+    padding:10px 14px;transition:background .15s,color .15s;white-space:nowrap;
+  }
+  button.btn.primary{background:var(--accent);color:#fff}
+  button.btn.primary:hover:not(:disabled){background:#0a53ab}
+  button.btn.ghost{background:var(--fill);color:var(--accent)}
+  button.btn.ghost:hover:not(:disabled){background:var(--fill-hover)}
+  button.btn:disabled{opacity:.45;cursor:default}
+  #checkBtn{flex:1}
+
+  .final h2{font-size:16px;margin:0 0 4px;font-weight:700}
+  .final .lead{font-size:12.5px;color:var(--muted);margin:0 0 8px;line-height:1.45}
+
+  .table-wrap{overflow-x:auto;margin-top:12px;border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:12px;min-width:600px}
+  th,td{text-align:left;padding:8px 10px;vertical-align:top;border:0;line-height:1.35}
+  th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;white-space:nowrap}
+  tbody tr:nth-child(odd){background:#f7f9fc}
+  tbody tr.revealed-row{background:var(--violet-soft)}
+  td.num{color:var(--muted);width:24px}
+  .tag-crit{display:inline-block;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;color:#fff}
+  .tag-crit.high{background:var(--err)}
+  .tag-crit.mid{background:var(--warn)}
+  .tag-crit.low{background:var(--ok)}
+  .reveal-tag{color:var(--violet);font-size:11px;font-weight:700;white-space:nowrap}
+  .bar-kind{font-weight:650}
+  .bar-kind.eng{color:#0a4a99}
+  .bar-kind.org{color:var(--violet)}
+
+  .stat{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}
+  .stat span{background:var(--fill);border-radius:99px;padding:5px 12px;font-size:12.5px;font-weight:600}
+
+  .closing{margin-top:14px;font-size:13px;color:var(--muted);line-height:1.45}
+
+  [hidden]{display:none !important}
+
+  @media (max-width:600px){
+    body{padding:12px}
+    .barrier{grid-template-columns:1fr}
+    .crit-row{grid-template-columns:1fr}
+    button.btn{flex:1 1 auto}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>HAZOP: барьеры и критичность</h1>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <main id="stage"></main>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ */
+/*  Данные сценариев                                                   */
+/* ------------------------------------------------------------------ */
+const TASKS = [
+  {
+    node: 'Линия нагнетания насоса Н-101',
+    deviation: 'Больше давления в линии нагнетания',
+    cause: 'Закрытие задвижки на выходе',
+    consequence: 'Разгерметизация фланцев, выброс продукта',
+    barriers: [
+      { text: 'Датчик давления PT-205 с отсечным клапаном', type: 'eng' },
+      { text: 'Предохранительный клапан PSV-301', type: 'eng' },
+      { text: 'Обход оборудования по маршруту с контролем давления по манометру', type: 'org' },
+      { text: 'Инструкция оператора по действиям при срабатывании противоаварийной автоматической защиты', type: 'org' },
+      { text: 'Система защиты предусмотрена проектом', type: 'none',
+        why: 'Мёртвый барьер: не названо ни устройство, ни действие. Проверить его невозможно — нет датчика, нет клапана, нет документа.' }
+    ],
+    crit: 'high',
+    critJust: [
+      { text: 'Последствие ведёт к выбросу опасного вещества — высокая', correct: true },
+      { text: 'Оборудование останавливается — поэтому высокая', correct: false,
+        why: 'Остановка без выброса — это средняя критичность, а не высокая.' },
+      { text: 'Последствие устраняется штатными средствами — низкая', correct: false,
+        why: 'Разгерметизация с выбросом штатными средствами не устраняется.' }
+    ]
+  },
+  {
+    node: 'Всасывающая линия насоса Н-101',
+    deviation: 'Нет расхода при работающем насосе',
+    cause: 'Засорение фильтра на всасе',
+    consequence: 'Кавитация, перегрев насоса, выход из строя',
+    barriers: [
+      { text: 'Датчик перепада давления на фильтре с сигнализацией', type: 'eng' },
+      { text: 'Обход оборудования по маршруту с проверкой перепада', type: 'org' },
+      { text: 'Регламент: замена фильтрующего элемента каждые 500 часов', type: 'org' },
+      { text: 'Наблюдение персонала за работой насоса', type: 'none',
+        why: 'Мёртвый барьер: не указано, кто, когда и что именно наблюдает. Такую строку нельзя ни проверить, ни выполнить.' }
+    ],
+    crit: 'mid',
+    critJust: [
+      { text: 'Остановка оборудования без выброса — средняя', correct: true },
+      { text: 'Есть кавитация — значит высокая', correct: false,
+        why: 'Кавитация сама по себе не выброс и не травма. Высокая ставится по последствиям с выбросом или травмой.' },
+      { text: 'Насос чинится по плану — низкая', correct: false,
+        why: 'Выход насоса из строя — это остановка, а не устранение штатными средствами.' }
+    ]
+  },
+  {
+    node: 'Линия нагнетания насоса Н-101',
+    deviation: 'Больше температуры перекачиваемой среды',
+    cause: 'Работа насоса на закрытую задвижку',
+    consequence: 'Повреждение уплотнения вала, утечка продукта',
+    barriers: [
+      { text: 'Датчик температуры TT-201 с аварийной сигнализацией', type: 'eng' },
+      { text: 'Реле температуры с автоматической остановкой насоса', type: 'eng' },
+      { text: 'Регламент контроля температуры нагнетания раз в смену', type: 'org' },
+      { text: 'Обучение оператора действиям при перегреве', type: 'org' },
+      { text: 'Персонал при необходимости принимает меры', type: 'none',
+        why: 'Мёртвый барьер: «при необходимости» — не действие. Нужно: кто, что, когда, по какому документу.' }
+    ],
+    crit: 'high',
+    critJust: [
+      { text: 'Есть утечка продукта — выброс опасного вещества, высокая', correct: true },
+      { text: 'Насос не останавливается — низкая', correct: false,
+        why: 'Критичность определяется последствием, а не фактом остановки. Утечка продукта — высокая.' },
+      { text: 'Сигнализация сработает — значит средняя', correct: false,
+        why: 'Критичность ставится по последствию, а не по наличию сигнализации.' }
+    ]
+  },
+  {
+    node: 'Насосный агрегат Н-101',
+    deviation: 'Больше вибрации насосного агрегата',
+    cause: 'Износ подшипника',
+    consequence: 'Повышенный шум и вибрация, устраняются плановой регулировкой без остановки',
+    barriers: [
+      { text: 'Датчик вибрации VB-101 с предупредительной сигнализацией', type: 'eng' },
+      { text: 'Обход оборудования по маршруту с прослушиванием и осмотром', type: 'org' },
+      { text: 'План профилактического обслуживания подшипников', type: 'org' },
+      { text: 'Барьер отсутствует', type: 'none',
+        why: 'Это вариант записи, а не ошибка классификации — но здесь реальные барьеры есть, поэтому такой ответ неверен.' }
+    ],
+    crit: 'low',
+    critJust: [
+      { text: 'Последствие устраняется штатными средствами без остановки — низкая', correct: true },
+      { text: 'Вибрация опасна — высокая', correct: false,
+        why: 'Опасна не сама вибрация, а её последствия. Здесь последствие устраняется штатно, без выброса и остановки.' },
+      { text: 'Нужен ремонт — средняя', correct: false,
+        why: 'Остановка не требуется: работает плановая регулировка и обслуживание.' }
+    ]
+  }
+];
+
+/* ------------------------------------------------------------------ */
+/*  Утилиты и состояние                                                */
+/* ------------------------------------------------------------------ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+const CRIT_LABEL = { high: 'Высокая', mid: 'Средняя', low: 'Низкая' };
+const TYPE_LABEL = { eng: 'Инженерный', org: 'Организационный', none: 'Не барьер' };
+
+let states, idx;
+
+function initStates() {
+  states = TASKS.map(() => ({
+    picks: {},            // индекс барьера -> 'eng' | 'org' | 'none'
+    crit: null,
+    just: null,
+    passed: false,
+    revealed: false,
+    badItems: new Set(),
+    badCrit: false,
+    badJust: false,
+    attempted: false
+  }));
+  idx = 0;
+}
+
+function scrollTop() {
+  const app = document.querySelector('.app');
+  if (app) app.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Рендер сценария                                                    */
+/* ------------------------------------------------------------------ */
+function renderProgress() {
+  $('progress').innerHTML = TASKS.map((_, i) => {
+    let cls = '';
+    if (states[i].passed) cls = 'done';
+    else if (states[i].revealed) cls = 'revealed';
+    else if (i === idx) cls = 'active';
+    return `<span class="dot ${cls}"></span>`;
+  }).join('');
+}
+
+function render() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  renderProgress();
+
+  const locked = st.passed || st.revealed;
+  const dis = locked ? 'disabled' : '';
+
+  const barrierHtml = t.barriers.map((b, i) => {
+    const pick = st.picks[i];
+    let boxCls = 'barrier';
+    if (st.passed) {
+      if (pick === b.type) boxCls += ' right';
+    } else if (st.revealed) {
+      if (pick && pick === b.type) boxCls += ' revealed-right';
+      else if (pick) boxCls += ' wrong';
+    } else if (st.attempted) {
+      boxCls += pick === b.type ? ' right' : ' wrong';
+    }
+    const segBtn = (v, label) =>
+      `<button class="seg ${pick === v ? (v === 'eng' ? 'sel-eng' : v === 'org' ? 'sel-org' : 'sel-none') : ''}"
+        data-b="${i}" data-v="${v}" ${dis}>${label}</button>`;
+    return `<div class="${boxCls}">
+      <div>
+        <div class="btext">${esc(b.text)}</div>
+        ${b.why && (st.attempted || st.revealed) && pick !== b.type ? `<div class="bnote">${esc(b.why)}</div>` : ''}
+      </div>
+      <div class="segs">
+        ${segBtn('eng', 'Инженерный')}
+        ${segBtn('org', 'Организационный')}
+        ${segBtn('none', 'Не барьер')}
+      </div>
+    </div>`;
+  }).join('');
+
+  const critBtn = (v, label) => {
+    let cls = 'crit';
+    if (st.passed || st.attempted) {
+      if (st.crit === v) cls += v === t.crit ? ' right' : ' wrong';
+    } else if (st.revealed) {
+      if (st.crit === v) cls += v === t.crit ? ' revealed-right' : ' wrong';
+    } else if (st.crit === v) {
+      cls += ' sel';
+    }
+    return `<button class="${cls}" data-crit="${v}" ${dis}>${label}</button>`;
+  };
+
+  const justHtml = t.critJust.map((j, i) => {
+    let cls = 'just';
+    if (st.passed || st.attempted) {
+      if (st.just === i) cls += j.correct ? ' right' : ' wrong';
+    } else if (st.revealed) {
+      if (st.just === i) cls += j.correct ? ' revealed-right' : ' wrong';
+    } else if (st.just === i) {
+      cls += ' sel';
+    }
+    return `<button class="${cls}" data-j="${i}" ${dis}>${esc(j.text)}</button>`;
+  }).join('');
+
+  const pickedCount = Object.keys(st.picks).length;
+  const counter = st.revealed || st.passed
+    ? `${t.barriers.length} — размечено`
+    : `${pickedCount} из ${t.barriers.length}`;
+
+  const checkLabel = st.passed ? 'Проверено ✓' : 'Проверить';
+  const checkDis = locked || pickedCount < t.barriers.length || st.crit === null || st.just === null;
+  const isLast = idx === TASKS.length - 1;
+  const nextLabel = isLast ? 'К таблице →' : 'Далее →';
+  const nextClass = locked ? 'primary' : 'ghost';
+  const hintBtn = locked ? '' : '<button class="btn ghost" id="hintBtn">Показать правильный ответ</button>';
+
+  $('stage').innerHTML = `
+    <div class="scenario-head">
+      <span class="step-tag">Сценарий ${idx + 1} из ${TASKS.length}</span>
+      <span class="node">${esc(t.node)}</span>
+    </div>
+
+    <div class="context">
+      <div class="row"><b>Отклонение</b><span>${esc(t.deviation)}</span></div>
+      <div class="row"><b>Причина</b><span>${esc(t.cause)}</span></div>
+      <div class="row"><b>Последствие</b><span>${esc(t.consequence)}</span></div>
+    </div>
+
+    <section class="col">
+      <h2><span class="step-num">1</span>Барьеры <span class="counter">· ${counter}</span></h2>
+      <div class="barrier-list">${barrierHtml}</div>
+    </section>
+
+    <section class="col" style="margin-top:18px">
+      <h2><span class="step-num step-num-2">2</span>Критичность</h2>
+      <p class="lead">Высокая — выброс опасного вещества или травма. Средняя — остановка оборудования без выброса. Низкая — устраняется штатными средствами без остановки.</p>
+      <div class="crit-row">
+        ${critBtn('high', 'Высокая')}
+        ${critBtn('mid', 'Средняя')}
+        ${critBtn('low', 'Низкая')}
+      </div>
+    </section>
+
+    <section class="col" style="margin-top:16px">
+      <h2><span class="step-num step-num-3">3</span>Обоснование</h2>
+      <p class="lead">Выберите обоснование, которое объясняет оценку.</p>
+      <div class="just-list">${justHtml}</div>
+    </section>
+
+    <div class="feedback" id="fb" ${st.attempted || st.passed || st.revealed ? '' : 'hidden'}></div>
+
+    <div class="nav">
+      <button class="btn ghost" id="backBtn" ${idx === 0 ? 'disabled' : ''}>← Назад</button>
+      <button class="btn primary" id="checkBtn" ${checkDis ? 'disabled' : ''}>${checkLabel}</button>
+      ${hintBtn}
+      <button class="btn ${nextClass}" id="nextBtn">${nextLabel}</button>
+    </div>
+  `;
+
+  renderFeedback();
+}
+
+function renderFeedback() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  const fb = $('fb');
+  if (!fb) return;
+
+  if (st.passed) {
+    fb.hidden = false;
+    fb.className = 'feedback ok';
+    fb.innerHTML = `<strong>Верно.</strong> Каждый барьер назван конкретно и отнесён к своему типу, критичность обоснована. Сценарий записан в таблицу.`;
+    return;
+  }
+  if (st.revealed) {
+    fb.hidden = false;
+    fb.className = 'feedback hint';
+    fb.innerHTML = `
+      <strong>Правильный ответ показан и записан в таблицу.</strong>
+      <ul>
+        ${t.barriers.map(b =>
+          `<li><span class="bar-kind ${b.type}">${TYPE_LABEL[b.type]}</span>: ${esc(b.text)}</li>`).join('')}
+        <li><b>Критичность:</b> ${CRIT_LABEL[t.crit]} — ${esc(t.critJust.find(j => j.correct).text)}</li>
+      </ul>
+      При повторном прохождении попробуйте справиться с этим сценарием самостоятельно.`;
+    return;
+  }
+  if (!st.attempted) {
+    fb.hidden = true;
+    return;
+  }
+
+  const parts = [];
+  st.badItems.forEach(i => {
+    const b = t.barriers[i];
+    parts.push(`<li><b>${esc(b.text)}</b> — ${esc(b.why || `это ${TYPE_LABEL[b.type].toLowerCase()}.`)}</li>`);
+  });
+  if (st.badCrit) {
+    parts.push(`<li><b>Критичность:</b> «${CRIT_LABEL[st.crit]}» — неверная оценка. Правило: выброс или травма — высокая; остановка без выброса — средняя; устраняется штатно без остановки — низкая.</li>`);
+  }
+  if (st.badJust) {
+    parts.push(`<li><b>Обоснование</b> не объясняет оценку. Выберите формулировку, которая ссылается на само последствие.</li>`);
+  }
+
+  fb.hidden = false;
+  fb.className = 'feedback err';
+  fb.innerHTML = `<strong>Пока не зачтено.</strong> Исправьте разметку:<ul>${parts.join('')}</ul>`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Действия                                                           */
+/* ------------------------------------------------------------------ */
+function onSeg(i, v) {
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  if (st.picks[i] === v) delete st.picks[i];
+  else st.picks[i] = v;
+  st.badItems = new Set();
+  st.attempted = false;
+  render();
+}
+
+function onCrit(v) {
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  st.crit = v;
+  st.badCrit = false;
+  st.attempted = false;
+  render();
+}
+
+function onJust(i) {
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  st.just = i;
+  st.badJust = false;
+  st.attempted = false;
+  render();
+}
+
+function onCheck() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+  if (Object.keys(st.picks).length < t.barriers.length || st.crit === null || st.just === null) return;
+
+  st.attempted = true;
+  st.badItems = new Set(
+    t.barriers.map((b, i) => st.picks[i] === b.type ? -1 : i).filter(i => i >= 0)
+  );
+  st.badCrit = st.crit !== t.crit;
+  st.badJust = !t.critJust[st.just].correct;
+
+  if (st.badItems.size === 0 && !st.badCrit && !st.badJust) st.passed = true;
+
+  render();
+
+  const fb = $('fb');
+  if (fb && !fb.hidden) fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function onReveal() {
+  const t = TASKS[idx];
+  const st = states[idx];
+  if (st.passed || st.revealed) return;
+
+  // Подставляем правильные ответы и сразу отправляем в таблицу
+  st.revealed = true;
+  st.attempted = false;
+  st.badItems = new Set();
+  st.badCrit = false;
+  st.badJust = false;
+  st.picks = Object.fromEntries(t.barriers.map((b, i) => [i, b.type]));
+  st.crit = t.crit;
+  st.just = t.critJust.findIndex(j => j.correct);
+
+  render();
+
+  const fb = $('fb');
+  if (fb && !fb.hidden) fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function onBack() {
+  if (idx === 0) return;
+  idx--;
+  render();
+  scrollTop();
+}
+
+function onNext() {
+  if (idx < TASKS.length - 1) {
+    idx++;
+    render();
+    scrollTop();
+  } else {
+    renderFinal();
+    scrollTop();
+  }
+}
+
+function onRestart() {
+  initStates();
+  render();
+  scrollTop();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Итоговая таблица                                                   */
+/* ------------------------------------------------------------------ */
+function renderFinal() {
+  $('progress').innerHTML = TASKS.map((_, i) => {
+    let cls = '';
+    if (states[i].passed) cls = 'done';
+    else if (states[i].revealed) cls = 'revealed';
+    return `<span class="dot ${cls}"></span>`;
+  }).join('');
+
+  const passedIdx = [], revealedIdx = [], notPassedIdx = [];
+  states.forEach((s, i) => {
+    if (s.passed) passedIdx.push(i);
+    else if (s.revealed) revealedIdx.push(i);
+    else notPassedIdx.push(i);
+  });
+
+  const buildRow = (i, revealed) => {
+    const s = states[i];
+    const t = TASKS[i];
+    const eng = t.barriers.filter((b, j) => s.picks[j] === 'eng').map(b => b.text);
+    const org = t.barriers.filter((b, j) => s.picks[j] === 'org').map(b => b.text);
+    const bArr = [];
+    if (eng.length) bArr.push(`<span class="bar-kind eng">Инженерные:</span> ${esc(eng.join('; '))}`);
+    if (org.length) bArr.push(`<span class="bar-kind org">Организационные:</span> ${esc(org.join('; '))}`);
+    if (!eng.length && !org.length) bArr.push('барьер отсутствует');
+    return `<tr class="${revealed ? 'revealed-row' : ''}">
+      <td class="num">${i + 1}</td>
+      <td>${esc(t.deviation)}</td>
+      <td>${esc(t.consequence)}</td>
+      <td>${bArr.join('<br>')}${revealed ? ' <span class="reveal-tag">✱ ответ показан</span>' : ''}</td>
+      <td><span class="tag-crit ${t.crit}">${CRIT_LABEL[t.crit]}</span><br>
+        <span style="color:var(--muted)">${esc(t.critJust[s.just]?.text || '')}</span></td>
+    </tr>`;
+  };
+
+  const rows = passedIdx.map(i => buildRow(i, false)).join('')
+    + revealedIdx.map(i => buildRow(i, true)).join('');
+
+  const tableHtml = rows
+    ? `<div class="table-wrap">
+         <table>
+           <thead><tr>
+             <th></th><th>Отклонение</th><th>Последствие</th><th>Барьеры</th><th>Критичность</th>
+           </tr></thead>
+           <tbody>${rows}</tbody>
+         </table>
+       </div>
+       ${revealedIdx.length ? `<p class="closing">✱ — правильный ответ был показан кнопкой. Этот сценарий стоит пройти самостоятельно.</p>` : ''}`
+    : `<p class="closing">Разобранных сценариев пока нет — вернитесь и проверьте хотя бы один.</p>`;
+
+  const statHtml = `
+    <div class="stat">
+      <span>Проверено: ${passedIdx.length} из ${TASKS.length}</span>
+      ${revealedIdx.length ? `<span>Показано: ${revealedIdx.length}</span>` : ''}
+    </div>`;
+
+  const bottomHtml = notPassedIdx.length
+    ? `<p class="closing">Не разобрано: сценарии ${notPassedIdx.map(i => i + 1).join(', ')}.</p>
+       <div class="nav">
+         <button class="btn primary" id="returnBtn" data-i="${notPassedIdx[0]}">Вернуться к сценарию ${notPassedIdx[0] + 1}</button>
+         <button class="btn ghost" id="restartBtn">Пройти заново</button>
+       </div>`
+    : `<div class="closing">
+         ${revealedIdx.length
+           ? `Все сценарии разобраны. Часть ответов была показана — при повторном прохождении попробуйте справиться с ними самостоятельно.`
+           : `Все сценарии проверены. Каждый барьер — это конкретный датчик, клапан, действие или документ.
+              Проверьте каждый вопросом: этот датчик существует, этот клапан установлен, этот оператор обучен?
+              Если ответа нет — барьер мёртвый, и запись не работает.`}
+       </div>
+       <div class="nav">
+         <button class="btn ghost" id="backToScen">← К сценариям</button>
+         <button class="btn primary" id="restartBtn">Пройти заново</button>
+       </div>`;
+
+  $('stage').innerHTML = `
+    <div class="final">
+      <div class="scenario-head">
+        <span class="step-tag">Результат</span>
+        <span class="node">${passedIdx.length + revealedIdx.length} из ${TASKS.length} разобрано</span>
+      </div>
+      <h2>Рабочая таблица HAZOP</h2>
+      <p class="lead">Отклонение → причина → последствие → барьеры → критичность.
+        Дальше группа добавляет меры по снижению риска.</p>
+
+      ${statHtml}
+
+      ${tableHtml}
+      ${bottomHtml}
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Делегирование кликов                                               */
+/* ------------------------------------------------------------------ */
+$('stage').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn || btn.disabled) return;
+
+  switch (btn.id) {
+    case 'checkBtn':   return onCheck();
+    case 'hintBtn':    return onReveal();
+    case 'backBtn':    return onBack();
+    case 'nextBtn':    return onNext();
+    case 'restartBtn': return onRestart();
+    case 'backToScen': idx = TASKS.length - 1; render(); scrollTop(); return;
+    case 'returnBtn':  idx = +btn.dataset.i; render(); scrollTop(); return;
+  }
+
+  if (btn.classList.contains('seg')) return onSeg(+btn.dataset.b, btn.dataset.v);
+  if (btn.classList.contains('crit')) return onCrit(btn.dataset.crit);
+  if (btn.classList.contains('just')) return onJust(+btn.dataset.j);
+});
+
+/* ------------------------------------------------------------------ */
+initStates();
+render();
+</script>
+</body>
+</html>
