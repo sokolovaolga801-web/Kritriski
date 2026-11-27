@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Меры управления риском</title>
+<style>
+  :root {
+    --blue-900: #0a3d6e;
+    --blue-700: #0b5cad;
+    --blue-500: #2f80ed;
+    --blue-200: #bcd9ff;
+    --blue-100: #e8f2ff;
+    --blue-050: #f4f9ff;
+    --white: #ffffff;
+    --text: #1c2b3a;
+    --muted: #4a5d70;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: transparent;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    color: var(--text);
+  }
+
+  /* ── Внешний контейнер: 650 × 400, без фона и границ ── */
+  .accordion {
+    width: 650px;
+    height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    background: transparent;
+    border: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .accordion::-webkit-scrollbar { width: 4px; }
+  .accordion::-webkit-scrollbar-track { background: transparent; }
+  .accordion::-webkit-scrollbar-thumb {
+    background: var(--blue-200);
+    border-radius: 2px;
+  }
+  .accordion::-webkit-scrollbar-thumb:hover {
+    background: var(--blue-500);
+  }
+
+  /* ── Пункт: внутри допускаются разделители и акценты ── */
+  .acc-item {
+    border-bottom: 1px solid var(--blue-100);
+  }
+
+  .acc-item:last-child {
+    border-bottom: 0;
+  }
+
+  .acc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+    padding: 13px 2px;
+    background: transparent;
+    border: 0;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--blue-900);
+    text-align: left;
+    cursor: pointer;
+    transition: color .2s ease, opacity .2s ease;
+  }
+
+  .acc-head:hover {
+    color: var(--blue-500);
+  }
+
+  .acc-head:focus-visible {
+    outline: 2px solid var(--blue-500);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .chev {
+    flex: 0 0 auto;
+    color: var(--blue-500);
+    opacity: .9;
+    transition: transform .3s ease;
+  }
+
+  .acc-item.open .acc-head {
+    color: var(--blue-700);
+  }
+
+  .acc-item.open .chev {
+    transform: rotate(180deg);
+  }
+
+  /* ── Тело пункта ── */
+  .acc-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .35s ease;
+  }
+
+  .acc-inner {
+    margin: 0 0 12px;
+    padding: 2px 24px 10px 14px;
+    border-left: 3px solid var(--blue-200);
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    background: linear-gradient(90deg, var(--blue-050), transparent 70%);
+    border-radius: 0 6px 6px 0;
+    transition: border-color .2s ease;
+  }
+
+  .acc-item.open .acc-inner {
+    border-left-color: var(--blue-500);
+  }
+
+  .acc-inner p { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="accordion" id="accordion">
+
+  <div class="acc-item">
+    <button class="acc-head" type="button" aria-expanded="false" aria-controls="panel-1">
+      <span>Устранение</span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+    <div class="acc-body" id="panel-1" role="region">
+      <div class="acc-inner">
+        <p>Опасность исчезает физически. Меняете технологию на безопасную, убираете хранение опасного продукта, сокращаете количество вещества на площадке. Такая мера снимает риск полностью, а не снижает его.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc-item">
+    <button class="acc-head" type="button" aria-expanded="false" aria-controls="panel-2">
+      <span>Инженерное снижение вероятности</span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+    <div class="acc-body" id="panel-2" role="region">
+      <div class="acc-inner">
+        <p>Опасность остаётся, но риск снижает конструкция и техника: дублирующий датчик, резервный насос, автоматическая блокировка, ревизия оборудования по ресурсу. Эти барьеры работают без человека — в этом их главная сила.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc-item">
+    <button class="acc-head" type="button" aria-expanded="false" aria-controls="panel-3">
+      <span>Защита и контроль</span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+    <div class="acc-body" id="panel-3" role="region">
+      <div class="acc-inner">
+        <p>Техника останавливает развитие события: ПАЗ, отсечные клапаны, аварийный сброс, газоанализаторы с сигнализацией.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc-item">
+    <button class="acc-head" type="button" aria-expanded="false" aria-controls="panel-4">
+      <span>Организационные меры</span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+    <div class="acc-body" id="panel-4" role="region">
+      <div class="acc-inner">
+        <p>Меняется поведение людей: регламенты, инструктажи, наряды-допуски, ЛОТОТО, контроль за соблюдением процедур.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="acc-item">
+    <button class="acc-head" type="button" aria-expanded="false" aria-controls="panel-5">
+      <span>Смягчение последствий</span>
+      <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
+    <div class="acc-body" id="panel-5" role="region">
+      <div class="acc-inner">
+        <p>Если авария всё же случилась: системы локализации, аварийная вентиляция, СИЗ, план ЛАРН, тренировки персонала.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.querySelectorAll('.acc-item').forEach(function (item) {
+    var head = item.querySelector('.acc-head');
+    var body = item.querySelector('.acc-body');
+
+    head.addEventListener('click', function () {
+      var isOpen = item.classList.toggle('open');
+      head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      body.style.maxHeight = isOpen ? body.scrollHeight + 'px' : '0px';
+    });
+  });
+
+  window.addEventListener('resize', function () {
+    document.querySelectorAll('.acc-item.open .acc-body').forEach(function (body) {
+      body.style.maxHeight = body.scrollHeight + 'px';
+    });
+  });
+</script>
+
+</body>
+</html>
